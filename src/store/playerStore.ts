@@ -1,0 +1,64 @@
+import { create } from 'zustand';
+import type { Track } from '@/types/music';
+
+interface PlayerStoreState {
+  currentTrack: Track | null;
+  queue: Track[];
+  queueIndex: number;
+  positionMs: number;
+  durationMs: number;
+  isPlaying: boolean;
+  audioQuality: 'AUTO' | 'HIGH' | 'LOW';
+
+  setCurrentTrack: (track: Track | null) => void;
+  setQueue: (queue: Track[], index?: number) => void;
+  playNext: () => void;
+  playPrevious: () => void;
+  setPositionMs: (pos: number) => void;
+  setDurationMs: (dur: number) => void;
+  setIsPlaying: (playing: boolean) => void;
+  setAudioQuality: (quality: 'AUTO' | 'HIGH' | 'LOW') => void;
+}
+
+export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
+  currentTrack: null,
+  queue: [],
+  queueIndex: 0,
+  positionMs: 0,
+  durationMs: 0,
+  isPlaying: false,
+  audioQuality: 'HIGH', // Default to high as requested
+
+  setCurrentTrack: (track) => set({ currentTrack: track }),
+  
+  setQueue: (queue, index = 0) => set({ 
+    queue, 
+    queueIndex: index,
+    currentTrack: queue[index] || null 
+  }),
+
+  playNext: () => {
+    const { queue, queueIndex } = get();
+    if (queueIndex < queue.length - 1) {
+      set({ 
+        queueIndex: queueIndex + 1,
+        currentTrack: queue[queueIndex + 1]
+      });
+    }
+  },
+
+  playPrevious: () => {
+    const { queue, queueIndex } = get();
+    if (queueIndex > 0) {
+      set({ 
+        queueIndex: queueIndex - 1,
+        currentTrack: queue[queueIndex - 1]
+      });
+    }
+  },
+
+  setPositionMs: (pos) => set({ positionMs: pos }),
+  setDurationMs: (dur) => set({ durationMs: dur }),
+  setIsPlaying: (playing) => set({ isPlaying: playing }),
+  setAudioQuality: (quality) => set({ audioQuality: quality }),
+}));
