@@ -1,17 +1,99 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import TopBar from '@/components/ui/TopBar';
+import TrackCard from '@/components/features/TrackCard';
+import { YouTubeSearchService } from '@/services/YouTubeSearchService';
+import { usePlayerStore } from '@/store/playerStore';
+import { AudioService } from '@/services/AudioService';
+import type { SearchResult, Track } from '@/types/music';
 
 const MOODS = [
   'Chill', 'Workout', 'Focus', 'Party', 'Sleep', 'Romance', 'Sad', 'Upbeat'
 ];
 
 export default function ExploreTab() {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  
+  const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
+  const setQueue = usePlayerStore((state) => state.setQueue);
+  const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
+
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    setIsSearching(true);
+    try {
+      const results = await YouTubeSearchService.search(searchQuery, 'song');
+      setSearchResults(results);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handlePlayTrack = async (track: SearchResult, index: number) => {
+    try {
+      if (!track.videoId) return;
+      setLoadingTrackId(track.videoId);
+      
+      const mappedTrack: Track = {
+        videoId: track.videoId,
+        title: track.title,
+        artist: track.channelTitle,
+        thumbnailUrl: track.thumbnailUrl,
+        durationMs: track.durationMs
+      };
+
+      setQueue([mappedTrack], 0);
+      setCurrentTrack(mappedTrack);
+      await AudioService.playTrack(mappedTrack.videoId);
+    } catch (error) {
+      console.error("Playback failed:", error);
+      alert("Failed to extract or play this track.");
+    } finally {
+      setLoadingTrackId(null);
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <TopBar />
+      <TopBar 
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        onSubmitEditing={handleSearch}
+      />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionHeader}>Browse Moods</Text>
+        
+        {isSearching ? (
+          <View style={styles.centerContainer}>
+            <ActivityIndicator size="large" color="#fff" />
+          </View>
+        ) : searchResults.length > 0 ? (
+          <>
+            <Text style={styles.sectionHeader}>Search Results</Text>
+            <View style={styles.resultsGrid}>
+              {searchResults.map((result, i) => (
+                <View key={result.videoId || result.id || i} style={styles.resultItem}>
+                  <TrackCard 
+                    track={{
+                      videoId: result.videoId || '',
+                      title: result.title,
+                      artist: result.channelTitle,
+                      thumbnailUrl: result.thumbnailUrl,
+                      durationMs: result.durationMs
+                    }}
+                    isLoading={loadingTrackId === result.videoId}
+                    onPress={() => handlePlayTrack(result, i)}
+                  />
+                </View>
+              ))}
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.sectionHeader}>Browse Moods</Text>
         
         <View style={styles.moodGrid}>
           {MOODS.map(mood => (
@@ -21,10 +103,11 @@ export default function ExploreTab() {
           ))}
         </View>
 
-        <Text style={styles.sectionHeader}>Top Charts</Text>
-        <View style={styles.placeholderContainer}>
-          <Text style={styles.placeholderText}>Charts will appear here.</Text>
-        </View>
+            <View style={styles.placeholderContainer}>
+              <Text style={styles.placeholderText}>Charts will appear here.</Text>
+            </View>
+          </>
+        )}
       </ScrollView>
     </View>
   );
@@ -75,5 +158,20 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: '#666',
     fontSize: 15,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 100,
+  },
+  resultsGrid: {
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 16,
+  },
+  resultItem: {
+    marginBottom: 8,
   }
 });

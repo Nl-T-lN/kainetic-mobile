@@ -15,8 +15,12 @@ export interface Playlist {
 interface LibraryState {
   playlists: Playlist[];
   recentTracks: Track[];
+  savedTracks: Track[];
   setPlaylists: (playlists: Playlist[]) => void;
   setRecentTracks: (tracks: Track[]) => void;
+  setSavedTracks: (tracks: Track[]) => void;
+  toggleSaveTrack: (track: Track) => void;
+  addRecentTrack: (track: Track) => void;
   addRecentTrack: (track: Track) => void;
   createPlaylist: (name: string, initialTracks?: Track[]) => string;
   deletePlaylist: (id: string) => void;
@@ -29,6 +33,7 @@ export const useLibraryStore = create<LibraryState>()(
     (set, get) => ({
       playlists: [],
       recentTracks: [],
+      savedTracks: [],
 
       setPlaylists: (playlists: Playlist[]) => {
         set({ playlists });
@@ -36,6 +41,22 @@ export const useLibraryStore = create<LibraryState>()(
 
       setRecentTracks: (tracks: Track[]) => {
         set({ recentTracks: tracks });
+      },
+
+      setSavedTracks: (tracks: Track[]) => {
+        set({ savedTracks: tracks });
+      },
+
+      toggleSaveTrack: (track: Track) => {
+        set((state) => {
+          const tracks = state.savedTracks || [];
+          const isSaved = tracks.some(t => t.videoId === track.videoId);
+          if (isSaved) {
+            return { savedTracks: tracks.filter(t => t.videoId !== track.videoId) };
+          } else {
+            return { savedTracks: [track, ...tracks] };
+          }
+        });
       },
 
       addRecentTrack: (track: Track) => {

@@ -13,7 +13,7 @@ export default function MiniPlayer() {
   const setIsPlaying = usePlayerStore((state) => state.setIsPlaying);
   const playNext = usePlayerStore((state) => state.playNext);
   
-  const savedTracks = useLibraryStore((state) => state.savedTracks);
+  const savedTracks = useLibraryStore((state) => state.savedTracks) || [];
   const toggleSaveTrack = useLibraryStore((state) => state.toggleSaveTrack);
 
   const positionMs = usePlayerStore((state) => state.positionMs);

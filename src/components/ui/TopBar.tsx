@@ -4,7 +4,13 @@ import { Search, User } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-export default function TopBar() {
+interface TopBarProps {
+  value?: string;
+  onChangeText?: (text: string) => void;
+  onSubmitEditing?: () => void;
+}
+
+export default function TopBar({ value, onChangeText, onSubmitEditing }: TopBarProps) {
   const insets = useSafeAreaInsets();
 
   return (
@@ -23,6 +29,9 @@ export default function TopBar() {
             placeholder="Search songs, artists..."
             placeholderTextColor="#888"
             returnKeyType="search"
+            value={value}
+            onChangeText={onChangeText}
+            onSubmitEditing={onSubmitEditing}
           />
         </View>
 

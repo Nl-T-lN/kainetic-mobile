@@ -26,15 +26,31 @@ export interface InnerTubeResponse {
 const FALLBACK_CLIENTS = [
   {
     name: 'WEB_REMIX',
-    payload: { clientName: 'WEB_REMIX', clientVersion: '1.20231214.00.00', osName: 'Android', osVersion: '13', hl: 'en', gl: 'US' },
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0',
+    clientId: '67',
+    payload: { clientName: 'WEB_REMIX', clientVersion: '1.20260213.01.00', hl: 'en', gl: 'US' },
   },
   {
-    name: 'ANDROID_VR', // Excellent non-cipher client for Android
-    payload: { clientName: 'ANDROID_VR', clientVersion: '1.56.24', osName: 'Android', osVersion: '13', hl: 'en', gl: 'US' },
+    name: 'ANDROID_VR', // Excellent non-cipher client for Android (Quest 3 spoof)
+    userAgent: 'com.google.android.apps.youtube.vr.oculus/1.61.48 (Linux; U; Android 12; en_US; Quest 3; Build/SQ3A.220605.009.A1; Cronet/132.0.6808.3)',
+    clientId: '28',
+    payload: { 
+      clientName: 'ANDROID_VR', 
+      clientVersion: '1.61.48', 
+      osName: 'Android', 
+      osVersion: '12', 
+      deviceMake: 'Oculus',
+      deviceModel: 'Quest 3',
+      androidSdkVersion: '32',
+      hl: 'en', 
+      gl: 'US' 
+    },
   },
   {
     name: 'TVHTML5', // Bypasses many restrictions, natively returns direct URLs
-    payload: { clientName: 'TVHTML5', clientVersion: '7.20230405.08.01', hl: 'en', gl: 'US' },
+    userAgent: 'Mozilla/5.0(SMART-TV; Linux; Tizen 4.0.0.2) AppleWebkit/605.1.15 (KHTML, like Gecko) SamsungBrowser/9.2 TV Safari/605.1.15',
+    clientId: '7',
+    payload: { clientName: 'TVHTML5', clientVersion: '7.20260213.00.00', hl: 'en', gl: 'US' },
   }
 ];
 
@@ -52,9 +68,11 @@ export class InnerTubeService {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Mobile Safari/537.36',
-            'X-YouTube-Client-Name': client.name === 'WEB_REMIX' ? '67' : '1',
+            'User-Agent': client.userAgent,
+            'X-YouTube-Client-Name': client.clientId,
             'X-YouTube-Client-Version': client.payload.clientVersion,
+            'Origin': 'https://music.youtube.com',
+            'Referer': 'https://music.youtube.com/'
           },
           body: JSON.stringify({
             context: { client: client.payload },
