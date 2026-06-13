@@ -23,7 +23,7 @@ export class AudioService {
       }
 
       const quality = usePlayerStore.getState().audioQuality;
-      const response = await InnerTubeService.getPlayerResponse(videoId);
+      const { data: response, userAgent } = await InnerTubeService.getPlayerResponse(videoId);
       const format = InnerTubeService.extractBestAudioFormat(response, quality);
 
       if (!format) {
@@ -41,7 +41,12 @@ export class AudioService {
 
       console.log(`[AudioService] Playing ${quality} quality stream:`, streamUrl);
 
-      this.player = createAudioPlayer(streamUrl);
+      this.player = createAudioPlayer({
+        uri: streamUrl,
+        headers: {
+          'User-Agent': userAgent
+        }
+      });
       this.player.play();
       usePlayerStore.getState().setIsPlaying(true);
       

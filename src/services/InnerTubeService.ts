@@ -25,6 +25,21 @@ export interface InnerTubeResponse {
 // Metrolist-inspired robust clients to bypass ciphering and age restrictions
 const FALLBACK_CLIENTS = [
   {
+    name: 'IOS', // Bypasses cipher completely and returns direct Opus/MP4A streams
+    userAgent: 'com.google.ios.youtube/21.03.1 (iPhone16,2; U; CPU iOS 18_2 like Mac OS X;)',
+    clientId: '5',
+    payload: {
+      clientName: 'IOS',
+      clientVersion: '21.03.1',
+      osName: 'iOS',
+      osVersion: '18.2.22C152',
+      deviceMake: 'Apple',
+      deviceModel: 'iPhone16,2',
+      hl: 'en',
+      gl: 'US'
+    }
+  },
+  {
     name: 'WEB_REMIX',
     userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:140.0) Gecko/20100101 Firefox/140.0',
     clientId: '67',
@@ -59,7 +74,7 @@ export class InnerTubeService {
    * Fetches the player response using a robust fallback loop.
    * If a client fails, returns ciphered URLs, or denies playback, it instantly tries the next client.
    */
-  static async getPlayerResponse(videoId: string): Promise<InnerTubeResponse> {
+  static async getPlayerResponse(videoId: string): Promise<{ data: InnerTubeResponse, userAgent: string }> {
     for (const client of FALLBACK_CLIENTS) {
       try {
         console.log(`[InnerTube] Trying ${client.name} for ${videoId}...`);
@@ -98,7 +113,7 @@ export class InnerTubeService {
         }
 
         console.log(`[InnerTube] Success with ${client.name}!`);
-        return data;
+        return { data, userAgent: client.userAgent };
       } catch (e) {
         console.warn(`[InnerTube] ${client.name} request failed.`, e);
       }
@@ -124,12 +139,12 @@ export class InnerTubeService {
 
     if (formats.length === 0) return null;
 
-    // Sort by Opus > MP4A (Android-only optimization)
+    // Sort by MP4A > Opus (Android native media player optimization and iOS compatibility)
     formats.sort((a, b) => {
-      const aIsOpus = a.mimeType.includes('opus');
-      const bIsOpus = b.mimeType.includes('opus');
-      if (aIsOpus && !bIsOpus) return -1;
-      if (!aIsOpus && bIsOpus) return 1;
+      const aIsMp4 = a.mimeType.includes('mp4a');
+      const bIsMp4 = b.mimeType.includes('mp4a');
+      if (aIsMp4 && !bIsMp4) return -1;
+      if (!aIsMp4 && bIsMp4) return 1;
       return b.bitrate - a.bitrate; // Tie-breaker: higher bitrate
     });
 

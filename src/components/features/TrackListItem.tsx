@@ -56,8 +56,8 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    padding: 8,
+    backgroundColor: 'transparent', // The parent handles background in chunks, but we can make it match here if used alone
   },
   indexText: {
     color: '#888',
@@ -67,39 +67,37 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   thumbnail: {
-    width: 48,
-    height: 48,
-    borderRadius: 8,
+    width: 64,
+    height: 64,
+    borderRadius: 6,
     backgroundColor: '#222',
   },
   trackInfo: {
     flex: 1,
-    marginLeft: 12,
-    marginRight: 10,
+    marginLeft: 16,
+    marginRight: 8,
     justifyContent: 'center',
   },
   title: {
     color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
     marginBottom: 4,
   },
   artist: {
     color: '#aaa',
-    fontSize: 14,
+    fontSize: 13,
   },
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
   durationText: {
     color: '#aaa',
     fontSize: 13,
   },
   iconButton: {
-    width: 32,
-    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
   }
