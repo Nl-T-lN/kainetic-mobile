@@ -10,6 +10,13 @@ interface TrackListItemProps {
   index?: number;
 }
 
+function formatTime(ms: number) {
+  const totalSeconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+}
+
 export default function TrackListItem({ track, isLoading, onPress, index }: TrackListItemProps) {
   return (
     <TouchableOpacity 
@@ -29,8 +36,12 @@ export default function TrackListItem({ track, isLoading, onPress, index }: Trac
       </View>
 
       <View style={styles.actions}>
+        {track.durationMs ? (
+          <Text style={styles.durationText}>{formatTime(track.durationMs)}</Text>
+        ) : null}
+        
         {isLoading ? (
-          <ActivityIndicator color="#1db954" size="small" />
+          <ActivityIndicator color="#1db954" size="small" style={{ marginLeft: 8 }} />
         ) : (
           <TouchableOpacity style={styles.iconButton}>
             <MoreVertical size={20} color="#888" />
@@ -80,10 +91,15 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 8,
+  },
+  durationText: {
+    color: '#aaa',
+    fontSize: 13,
   },
   iconButton: {
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
     justifyContent: 'center',
     alignItems: 'center',
   }

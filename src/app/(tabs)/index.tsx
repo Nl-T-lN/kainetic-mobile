@@ -5,6 +5,7 @@ import { AudioService } from '@/services/AudioService';
 import type { Track } from '@/types/music';
 import TopBar from '@/components/ui/TopBar';
 import TrackCard from '@/components/features/TrackCard';
+import TrackListItem from '@/components/features/TrackListItem';
 
 const TRENDING_TRACKS: Track[] = [
   {
@@ -53,7 +54,7 @@ export default function HomeTab() {
     <View style={styles.container}>
       <TopBar />
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionHeader}>Recommended For You</Text>
+        <Text style={styles.sectionHeader}>Jam Again</Text>
         <ScrollView 
           horizontal 
           showsHorizontalScrollIndicator={false}
@@ -69,21 +70,17 @@ export default function HomeTab() {
           ))}
         </ScrollView>
 
-        <Text style={styles.sectionHeader}>Trending Now</Text>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.horizontalScroll}
-        >
+        <Text style={styles.sectionHeader}>Recommendations</Text>
+        <View style={styles.listContainer}>
           {[...TRENDING_TRACKS].reverse().map((track, index) => (
-            <TrackCard
-              key={track.videoId + '-trend'}
+            <TrackListItem
+              key={track.videoId + '-rec'}
               track={track}
               isLoading={loadingTrackId === track.videoId}
               onPress={() => handlePlayTrack(track, index)}
             />
           ))}
-        </ScrollView>
+        </View>
       </ScrollView>
     </View>
   );
@@ -111,5 +108,8 @@ const styles = StyleSheet.create({
     gap: 16,
     paddingLeft: 16,
     paddingRight: 32,
+  },
+  listContainer: {
+    paddingHorizontal: 0,
   },
 });
