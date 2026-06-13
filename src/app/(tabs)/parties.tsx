@@ -1,9 +1,39 @@
-import React from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, Alert } from 'react-native';
 import TopBar from '@/components/ui/TopBar';
-import { Users, Plus, ArrowRight } from 'lucide-react-native';
+import { Users, Plus, ArrowRight, LogOut } from 'lucide-react-native';
+import { ablySync } from '@/services/AblyService';
+import { usePlayerStore } from '@/store/playerStore';
 
 export default function PartiesTab() {
+  const [roomCode, setRoomCode] = useState('');
+  const [activeRoom, setActiveRoom] = useState<string | null>(ablySync.roomId);
+  const [isHost, setIsHost] = useState(ablySync.isHost);
+
+  const handleJoin = () => {
+    if (!roomCode.trim()) return;
+    ablySync.init(roomCode.trim(), false);
+    setActiveRoom(roomCode.trim());
+    setIsHost(false);
+  };
+
+  const handleCreate = () => {
+    const newRoom = Math.random().toString(36).substring(2, 8).toUpperCase();
+    ablySync.init(newRoom, true);
+    setActiveRoom(newRoom);
+    setIsHost(true);
+    
+    // Broadcast immediately so people joining get the current state
+    ablySync.broadcastState();
+  };
+
+  const handleLeave = () => {
+    ablySync.disconnect();
+    setActiveRoom(null);
+    setIsHost(false);
+    usePlayerStore.getState().setIsPlaying(false);
+  };
+
   return (
     <View style={styles.container}>
       <TopBar />
@@ -18,30 +48,51 @@ export default function PartiesTab() {
           </Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Join a Party</Text>
-          <View style={styles.inputRow}>
-            <TextInput 
-              style={styles.input}
-              placeholder="Enter Room Code"
-              placeholderTextColor="#888"
-            />
-            <TouchableOpacity style={styles.joinButton}>
-              <ArrowRight size={20} color="#000" />
+        {activeRoom ? (
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>You are in a Party!</Text>
+            <View style={styles.activeRoomBox}>
+              <Text style={styles.roomCodeLabel}>Room Code</Text>
+              <Text style={styles.roomCodeValue}>{activeRoom}</Text>
+            </View>
+            <Text style={styles.roleText}>Role: {isHost ? 'Host (You control playback)' : 'Guest (Listening to host)'}</Text>
+            
+            <TouchableOpacity style={styles.leaveButton} onPress={handleLeave}>
+              <LogOut size={20} color="#fff" style={styles.createIcon} />
+              <Text style={styles.createText}>Leave Party</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        ) : (
+          <>
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Join a Party</Text>
+              <View style={styles.inputRow}>
+                <TextInput 
+                  style={styles.input}
+                  placeholder="Enter Room Code"
+                  placeholderTextColor="#888"
+                  value={roomCode}
+                  onChangeText={setRoomCode}
+                  autoCapitalize="characters"
+                />
+                <TouchableOpacity style={styles.joinButton} onPress={handleJoin}>
+                  <ArrowRight size={20} color="#000" />
+                </TouchableOpacity>
+              </View>
+            </View>
 
-        <View style={styles.divider}>
-          <View style={styles.line} />
-          <Text style={styles.orText}>OR</Text>
-          <View style={styles.line} />
-        </View>
+            <View style={styles.divider}>
+              <View style={styles.line} />
+              <Text style={styles.orText}>OR</Text>
+              <View style={styles.line} />
+            </View>
 
-        <TouchableOpacity style={styles.createButton} activeOpacity={0.8}>
-          <Plus size={20} color="#fff" style={styles.createIcon} />
-          <Text style={styles.createText}>Create New Party</Text>
-        </TouchableOpacity>
+            <TouchableOpacity style={styles.createButton} activeOpacity={0.8} onPress={handleCreate}>
+              <Plus size={20} color="#fff" style={styles.createIcon} />
+              <Text style={styles.createText}>Create New Party</Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
@@ -146,6 +197,15 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
+  leaveButton: {
+    flexDirection: 'row',
+    height: 48,
+    backgroundColor: '#e74c3c',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 20,
+  },
   createIcon: {
     marginRight: 8,
   },
@@ -153,5 +213,28 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  activeRoomBox: {
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  roomCodeLabel: {
+    color: '#aaa',
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  roomCodeValue: {
+    color: '#1db954',
+    fontSize: 32,
+    fontWeight: 'bold',
+    letterSpacing: 2,
+  },
+  roleText: {
+    color: '#ddd',
+    fontSize: 14,
+    textAlign: 'center',
   }
 });

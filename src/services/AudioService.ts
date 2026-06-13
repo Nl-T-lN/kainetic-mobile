@@ -1,6 +1,7 @@
 import { createAudioPlayer, AudioPlayer } from 'expo-audio';
 import { usePlayerStore } from '@/store/playerStore';
 import { InnerTubeService } from './InnerTubeService';
+import { ablySync } from './AblyService';
 
 export class AudioService {
   private static player: AudioPlayer | null = null;
@@ -43,13 +44,19 @@ export class AudioService {
       this.player = createAudioPlayer(streamUrl);
       this.player.play();
       usePlayerStore.getState().setIsPlaying(true);
+      
+      ablySync.broadcastState();
 
       // Track status manually since expo-audio might require a different callback mechanism
       this.statusInterval = setInterval(() => {
         if (this.player) {
           usePlayerStore.getState().setPositionMs(this.player.currentTime * 1000);
           usePlayerStore.getState().setDurationMs(this.player.duration * 1000);
-          usePlayerStore.getState().setIsPlaying(this.player.playing);
+          
+          if (usePlayerStore.getState().isPlaying !== this.player.playing) {
+             usePlayerStore.getState().setIsPlaying(this.player.playing);
+             ablySync.broadcastState();
+          }
           
           if (this.player.currentTime >= this.player.duration && this.player.duration > 0) {
             usePlayerStore.getState().playNext();
@@ -60,14 +67,23 @@ export class AudioService {
     } catch (error) {
       console.error('[AudioService] Playback Error:', error);
       usePlayerStore.getState().setIsPlaying(false);
+      ablySync.broadcastState();
     }
   }
 
   static async pause() {
-    if (this.player) this.player.pause();
+    if (this.player) {
+      this.player.pause();
+      usePlayerStore.getState().setIsPlaying(false);
+      ablySync.broadcastState();
+    }
   }
 
   static async resume() {
-    if (this.player) this.player.play();
+    if (this.player) {
+      this.player.play();
+      usePlayerStore.getState().setIsPlaying(true);
+      ablySync.broadcastState();
+    }
   }
 }

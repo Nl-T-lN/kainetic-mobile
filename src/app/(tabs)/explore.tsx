@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { useRouter } from 'expo-router';
 import TopBar from '@/components/ui/TopBar';
 import TrackCard from '@/components/features/TrackCard';
 import { YouTubeSearchService } from '@/services/YouTubeSearchService';
@@ -12,6 +13,7 @@ const MOODS = [
 ];
 
 export default function ExploreTab() {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -24,7 +26,7 @@ export default function ExploreTab() {
     if (!searchQuery.trim()) return;
     setIsSearching(true);
     try {
-      const results = await YouTubeSearchService.search(searchQuery, 'song');
+      const results = await YouTubeSearchService.search(searchQuery, 'all');
       setSearchResults(results);
     } catch (e) {
       console.error(e);
@@ -35,7 +37,13 @@ export default function ExploreTab() {
 
   const handlePlayTrack = async (track: SearchResult, index: number) => {
     try {
-      if (!track.videoId) return;
+      if (track.type !== 'song' || !track.videoId) {
+        if (track.type === 'playlist') router.push(`/playlist/${track.id}`);
+        else if (track.type === 'album') router.push(`/album/${track.id}`);
+        else if (track.type === 'artist') router.push(`/artist/${track.id}`);
+        return;
+      }
+      
       setLoadingTrackId(track.videoId);
       
       const mappedTrack: Track = {

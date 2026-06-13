@@ -1,5 +1,43 @@
 import { SearchResult } from '@/types/music';
 
+export function getHighResThumbnail(thumbnails: any): string {
+  if (!thumbnails) return "";
+  
+  let thumbArray = thumbnails;
+  if (typeof thumbnails === 'object' && !Array.isArray(thumbnails)) {
+    if (thumbnails.contents && Array.isArray(thumbnails.contents)) {
+      thumbArray = thumbnails.contents;
+    } else if (thumbnails.thumbnails && Array.isArray(thumbnails.thumbnails)) {
+      thumbArray = thumbnails.thumbnails;
+    } else if (thumbnails.url) {
+      thumbArray = [thumbnails];
+    } else {
+      thumbArray = [thumbnails];
+    }
+  } else if (!Array.isArray(thumbnails)) {
+    thumbArray = [thumbnails];
+  }
+
+  if (!Array.isArray(thumbArray) || thumbArray.length === 0) return "";
+  
+  const sorted = [...thumbArray].sort((a, b) => (b.width || 0) - (a.width || 0));
+  if (!sorted[0] || !sorted[0].url) return "";
+  
+  let url = sorted[0].url;
+
+  if (url.includes("googleusercontent.com") || url.includes("yt3.ggpht.com")) {
+    url = url.replace(/=[ws]\d+(?:-h\d+)?(?:-[a-zA-Z0-9_-]+)*/, "=w1200-h1200");
+  } else if (url.includes("i.ytimg.com")) {
+    url = url.replace("maxresdefault.jpg", "hqdefault.jpg");
+  }
+  
+  if (url.startsWith('//')) {
+    url = 'https:' + url;
+  }
+
+  return url;
+}
+
 const SEARCH_API = 'https://music.youtube.com/youtubei/v1/search';
 
 const WEB_CLIENT_PAYLOAD = {
@@ -28,16 +66,13 @@ export class YouTubeSearchService {
    * Searches YouTube Music directly and parses the complex JSON AST
    * into a clean SearchResult array.
    */
-  static async search(query: string, type: 'song' | 'artist' | 'album' = 'song'): Promise<SearchResult[]> {
+  static async search(query: string, type: 'song' | 'artist' | 'album' | 'playlist' | 'all' = 'song'): Promise<SearchResult[]> {
     try {
-      // Params string for filtering. These are standard InnerTube params.
-      // Eg-KAQwIARAO = Songs
-      // Eg-KAQwIARAB = Albums
-      // Eg-KAQwIARAW = Artists
       let params = '';
       if (type === 'song') params = 'Eg-KAQwIARAO';
       if (type === 'album') params = 'Eg-KAQwIARAB';
       if (type === 'artist') params = 'Eg-KAQwIARAW';
+      if (type === 'playlist') params = 'Eg-KAQwIARAw';
 
       const response = await fetch(SEARCH_API, {
         method: 'POST',
@@ -77,30 +112,49 @@ export class YouTubeSearchService {
         const id = type === 'song' ? videoId : browseId;
         if (!id) continue; // Skip if we can't find a valid ID for the requested type
 
+        // Filter out actual videos (UGC/Official Music Videos) to only return "Songs" (ATV)
+        const musicVideoType = 
+            renderer.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint?.watchEndpointMusicSupportedConfigs?.watchEndpointMusicConfig?.musicVideoType || 
+            renderer.navigationEndpoint?.watchEndpoint?.watchEndpointMusicSupportedConfigs?.watchEndpointMusicConfig?.musicVideoType;
+            
+        if (type === 'song' && musicVideoType && musicVideoType !== 'MUSIC_VIDEO_TYPE_ATV') {
+           continue;
+        }
+
         // 2. Extract Title
         const titleRuns = renderer.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs;
         const title = titleRuns?.[0]?.text || 'Unknown Title';
 
         // 3. Extract Subtitle (Artist / Info)
-        const subtitleRuns = renderer.flexColumns?.[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs;
+        const subtitleRuns = renderer.flexColumns?.[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
         let subtitle = 'Unknown';
-        if (subtitleRuns) {
+        let durationMs = 0;
+        
+        if (subtitleRuns.length > 0) {
           subtitle = subtitleRuns.map((r: any) => r.text).join('').replace(/•/g, '').trim();
+          
+          // Try to extract duration from the last run if it looks like mm:ss
+          const lastRunText = subtitleRuns[subtitleRuns.length - 1]?.text;
+          if (lastRunText && /^\d+:\d{2}$/.test(lastRunText)) {
+            const parts = lastRunText.split(':');
+            durationMs = (parseInt(parts[0]) * 60 + parseInt(parts[1])) * 1000;
+            // Clean up subtitle by removing the duration and trailing separators
+            subtitle = subtitle.replace(lastRunText, '').replace(/•/g, '').trim();
+          }
         }
 
         // 4. Extract Thumbnail
-        const thumbnails = renderer.thumbnail?.musicThumbnailRenderer?.thumbnail?.thumbnails;
-        const thumbnailUrl = thumbnails?.length > 0 ? thumbnails[thumbnails.length - 1].url : '';
+        const thumbnailUrl = getHighResThumbnail(renderer.thumbnail?.musicThumbnailRenderer?.thumbnail);
 
         // Push to results
         results.push({
           videoId: type === 'song' ? id : undefined,
           id: type !== 'song' ? id : undefined,
           title: title,
-          channelTitle: subtitle, // We map subtitle to channelTitle for simplicity
+          channelTitle: subtitle, 
           thumbnailUrl: thumbnailUrl,
           type: type,
-          durationMs: 0, // We can't easily parse duration from search AST without complex regex
+          durationMs: durationMs,
         });
       }
 
