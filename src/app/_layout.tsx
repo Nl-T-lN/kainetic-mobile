@@ -2,8 +2,14 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
 import MiniPlayer from '@/components/features/MiniPlayer';
+import { AudioService } from '@/services/AudioService';
+import { useEffect } from 'react';
 
 export default function RootLayout() {
+  useEffect(() => {
+    AudioService.init();
+  }, []);
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
