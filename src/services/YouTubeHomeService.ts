@@ -80,14 +80,13 @@ export class YouTubeHomeService {
             const thumbnailUrl = getHighResThumbnail(item.thumbnailRenderer?.musicThumbnailRenderer?.thumbnail);
             
             // Determine type
-            let type: 'song' | 'playlist' | 'artist' | 'album' = 'song';
-            if (browseId?.startsWith('VL') || playlistId) type = 'playlist';
-            else if (browseId?.startsWith('UC')) type = 'artist';
+            let type: 'song' | 'playlist' | 'artist' | 'album' = 'playlist'; // Default to playlist for two-row items
+            if (browseId?.startsWith('UC')) type = 'artist';
             else if (browseId?.startsWith('MPRE')) type = 'album';
             
             items.push({
-                id: type !== 'song' ? (playlistId || id).replace(/^VL/, '') : undefined,
-                videoId: type === 'song' ? id : undefined,
+                id: (playlistId || id).replace(/^VL/, ''),
+                videoId: undefined,
                 title: itemTitle,
                 channelTitle: subtitle,
                 thumbnailUrl: thumbnailUrl,

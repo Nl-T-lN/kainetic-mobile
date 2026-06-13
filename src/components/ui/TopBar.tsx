@@ -1,37 +1,29 @@
 import React from 'react';
-import { View, TextInput, StyleSheet, TouchableOpacity, Image, Text } from 'react-native';
-import { Search, User } from 'lucide-react-native';
-import { BlurView } from 'expo-blur';
+import { View, StyleSheet, TouchableOpacity, Text } from 'react-native';
+import { User, Settings, Radio } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 
-interface TopBarProps {
-  value?: string;
-  onChangeText?: (text: string) => void;
-  onSubmitEditing?: () => void;
-}
-
-export default function TopBar({ value, onChangeText, onSubmitEditing }: TopBarProps) {
+export default function TopBar() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 20) }]}>
       <View style={styles.inner}>
-        <View style={styles.searchContainer}>
-          <Search color="#888" size={18} style={styles.searchIcon} />
-          <TextInput 
-            style={styles.searchInput}
-            placeholder="What do you want to play?"
-            placeholderTextColor="#888"
-            returnKeyType="search"
-            value={value}
-            onChangeText={onChangeText}
-            onSubmitEditing={onSubmitEditing}
-          />
-        </View>
+        <Text style={styles.logoText}>kainetic</Text>
 
-        <TouchableOpacity style={styles.signInButton}>
-          <Text style={styles.signInText}>Sign In</Text>
-        </TouchableOpacity>
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/parties')}>
+            <Radio color="#fff" size={24} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.iconButton}>
+            <Settings color="#fff" size={24} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.profileButton}>
+            <User color="#000" size={20} />
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -45,35 +37,32 @@ const styles = StyleSheet.create({
   inner: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
-    gap: 12,
   },
-  searchContainer: {
-    flex: 1,
+  logoText: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -1,
+  },
+  actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-    borderRadius: 99,
-    paddingHorizontal: 12,
-    height: 40,
+    gap: 16,
   },
-  searchIcon: {
-    marginRight: 8,
+  iconButton: {
+    width: 36,
+    height: 36,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  searchInput: {
-    flex: 1,
-    color: '#fff',
-    fontSize: 15,
-  },
-  signInButton: {
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  profileButton: {
+    width: 32,
+    height: 32,
     borderRadius: 16,
-  },
-  signInText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 14,
+    backgroundColor: '#1db954',
+    justifyContent: 'center',
+    alignItems: 'center',
   }
 });

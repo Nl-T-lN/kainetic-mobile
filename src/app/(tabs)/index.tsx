@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { AudioService } from '@/services/AudioService';
 import { YouTubeHomeService, HomeSection } from '@/services/YouTubeHomeService';
+import { YouTubeSearchService } from '@/services/YouTubeSearchService';
 import type { Track, SearchResult } from '@/types/music';
 import TopBar from '@/components/ui/TopBar';
 import TrackCard from '@/components/features/TrackCard';
@@ -20,11 +21,22 @@ export default function HomeTab() {
   const [loading, setLoading] = useState(true);
   const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
 
+
+
   useEffect(() => {
     async function loadHome() {
       try {
-        const homeSections = await YouTubeHomeService.fetchHome();
-        setSections(homeSections);
+        const [homeSections, searchResults] = await Promise.all([
+          YouTubeHomeService.fetchHome(),
+          YouTubeSearchService.search('Top Pop Hits 2024', 'song')
+        ]);
+        
+        const recommendationsSection: HomeSection = {
+          title: 'Recommendations',
+          items: searchResults
+        };
+
+        setSections([recommendationsSection, ...homeSections]);
       } catch (err) {
         console.error('Failed to load home', err);
       } finally {
@@ -68,7 +80,52 @@ export default function HomeTab() {
     }
   };
 
+  const { width } = useWindowDimensions();
+
   const renderSection = (section: HomeSection, index: number) => {
+    const isSongSection = section.items[0]?.type === 'song';
+    const isArtistSection = section.items[0]?.type === 'artist' || section.title.toLowerCase().includes('artist');
+
+    if (isSongSection) {
+      // Chunk items into groups of 4 for the horizontal grid
+      const chunkSize = 4;
+      const chunks = [];
+      for (let i = 0; i < section.items.length; i += chunkSize) {
+        chunks.push(section.items.slice(i, i + chunkSize));
+      }
+
+      return (
+        <View key={index} style={styles.sectionContainer}>
+          <Text style={styles.sectionHeader}>{section.title}</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalScroll}
+          >
+            {chunks.map((chunk, chunkIdx) => (
+              <View key={`chunk-${chunkIdx}`} style={{ flexDirection: 'column', gap: 10, marginRight: 16 }}>
+                {chunk.map((item, i) => (
+                  <View key={item.videoId || item.id || i} style={{ width: width * 0.85, maxWidth: 400, backgroundColor: 'rgba(255, 255, 255, 0.04)', borderRadius: 8, borderWidth: 1, borderColor: 'rgba(255, 255, 255, 0.06)' }}>
+                    <TrackListItem
+                      track={{
+                          videoId: item.videoId || item.id || '',
+                          title: item.title,
+                          artist: item.channelTitle,
+                          thumbnailUrl: item.thumbnailUrl,
+                          durationMs: item.durationMs || 0,
+                      }}
+                      isLoading={loadingTrackId === item.videoId}
+                      onPress={() => handlePlayTrack(item, section.items)}
+                    />
+                  </View>
+                ))}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      );
+    }
+
     return (
       <View key={index} style={styles.sectionContainer}>
         <Text style={styles.sectionHeader}>{section.title}</Text>
@@ -78,18 +135,20 @@ export default function HomeTab() {
           contentContainerStyle={styles.horizontalScroll}
         >
           {section.items.map((item, i) => (
-            <TrackCard
-              key={item.videoId || item.id || i}
-              track={{
-                  videoId: item.videoId || item.id || '',
-                  title: item.title,
-                  artist: item.channelTitle,
-                  thumbnailUrl: item.thumbnailUrl,
-                  durationMs: item.durationMs || 0,
-              }}
-              isLoading={loadingTrackId === item.videoId}
-              onPress={() => handlePlayTrack(item, section.items)}
-            />
+            <View key={item.videoId || item.id || i} style={isArtistSection ? styles.artistWrapper : null}>
+              <TrackCard
+                track={{
+                    videoId: item.videoId || item.id || '',
+                    title: item.title,
+                    artist: item.channelTitle,
+                    thumbnailUrl: item.thumbnailUrl,
+                    durationMs: item.durationMs || 0,
+                }}
+                isLoading={loadingTrackId === item.videoId}
+                onPress={() => handlePlayTrack(item, section.items)}
+                isArtist={isArtistSection}
+              />
+            </View>
           ))}
         </ScrollView>
       </View>
@@ -127,7 +186,7 @@ export default function HomeTab() {
 
         {loading ? (
             <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color="#fff" />
+                <ActivityIndicator size="large" color="#1db954" />
             </View>
         ) : (
             sections.map((section, index) => renderSection(section, index))
@@ -169,4 +228,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 100,
   },
+  artistWrapper: {
+    width: 110,
+    alignItems: 'center',
+  }
 });

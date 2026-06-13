@@ -147,7 +147,7 @@ export class YouTubeBrowseService {
       // YouTube Music prefix for playlists is usually 'VL' for "Video List",
       // but the API handles playlist browseIds directly if we pass them correctly.
       // E.g. 'VLPL...' or just 'PL...'
-      const browseId = id.startsWith('PL') ? `VL${id}` : id;
+      const browseId = id.startsWith('PL') || id.startsWith('RD') ? `VL${id}` : id;
 
       const response = await fetch(BROWSE_API, {
         method: 'POST',

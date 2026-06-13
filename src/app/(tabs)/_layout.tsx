@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { StyleSheet, Platform } from 'react-native';
-import { Home, Compass, Library, Clock, Users } from 'lucide-react-native';
+import { Home, Compass, Library, Clock, Search } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -35,6 +35,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="search"
+        options={{
+          title: 'Search',
+          tabBarIcon: ({ color, size }) => <Search color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="library"
         options={{
           title: 'Library',
@@ -46,13 +53,6 @@ export default function TabLayout() {
         options={{
           title: 'Recent',
           tabBarIcon: ({ color, size }) => <Clock color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="parties"
-        options={{
-          title: 'Parties',
-          tabBarIcon: ({ color, size }) => <Users color={color} size={size} />,
         }}
       />
     </Tabs>

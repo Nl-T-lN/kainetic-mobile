@@ -149,7 +149,7 @@ const styles = StyleSheet.create({
     paddingTop: 100,
     paddingHorizontal: 20,
     paddingBottom: 32,
-    background: 'linear-gradient(180deg, rgba(30,30,30,1) 0%, rgba(0,0,0,1) 100%)',
+    backgroundColor: 'transparent',
   },
   heroImage: {
     width: 200,
