@@ -11,11 +11,13 @@ export interface Track {
 
 export interface SearchResult {
   videoId: string;
+  id?: string;
   title: string;
   channelTitle?: string;
   artistId?: string;
   thumbnailUrl: string;
   durationMs: number;
+  type?: 'song' | 'artist' | 'album' | 'playlist' | 'all';
 }
 
 export interface PlayerState {

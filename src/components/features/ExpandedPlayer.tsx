@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, SafeAreaView, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Dimensions } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronDown, Play, Pause, SkipBack, SkipForward, Repeat, Shuffle } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { usePlayerStore } from '@/store/playerStore';
@@ -57,7 +58,7 @@ export default function ExpandedPlayer({ isVisible, onClose }: ExpandedPlayerPro
           </View>
 
           <View style={styles.content}>
-            <Image 
+            <Image
               source={{ uri: currentTrack.thumbnailUrl }} 
               style={styles.artwork} 
             />
@@ -120,7 +121,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#000',
   },
   backgroundImage: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     width: '100%',
     height: '100%',
     opacity: 0.5,

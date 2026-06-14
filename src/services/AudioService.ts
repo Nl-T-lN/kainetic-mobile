@@ -1,78 +1,84 @@
-import { createAudioPlayer, AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, AudioPlayer, setAudioModeAsync } from 'expo-audio';
 import { usePlayerStore } from '@/store/playerStore';
 import { InnerTubeService } from './InnerTubeService';
 import { ablySync } from './AblyService';
 
 export class AudioService {
   private static player: AudioPlayer | null = null;
-  private static statusInterval: NodeJS.Timeout | null = null;
 
   static async init() {
-    // expo-audio manages background modes automatically based on app.json config
+    try {
+      await setAudioModeAsync({
+        playsInSilentMode: true,
+        interruptionMode: 'duckOthers',
+        shouldPlayInBackground: true,
+        allowsRecording: false,
+      });
+      console.log('[AudioService] Audio mode configured successfully');
+    } catch (e) {
+      console.error('[AudioService] Failed to set audio mode:', e);
+    }
   }
 
   static async playTrack(videoId: string) {
     try {
       if (this.player) {
-        this.player.pause();
+        try {
+          this.player.pause();
+          this.player.remove();
+        } catch (e) {}
         this.player = null;
-      }
-      
-      if (this.statusInterval) {
-        clearInterval(this.statusInterval);
       }
 
       const quality = usePlayerStore.getState().audioQuality;
-      const { data: response, userAgent } = await InnerTubeService.getPlayerResponse(videoId);
-      const format = InnerTubeService.extractBestAudioFormat(response, quality);
 
-      if (!format) {
-        throw new Error('No compatible audio formats found.');
+      console.log(`[AudioService] Requesting extraction for ${videoId}...`);
+      
+      // Ensure native engine is warm
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const result = await InnerTubeService.getAudioStreamUrl(videoId, quality);
+      
+      if (!result || !result.url) {
+        throw new Error('Extractor returned empty URL');
       }
 
-      let streamUrl = format.url;
+      console.log(`[AudioService] Success! Received URL: ${result.url.substring(0, 50)}...`);
 
-      if (!streamUrl && format.signatureCipher) {
-        console.warn('Ciphered stream detected. Deciphering required.');
-        throw new Error('Cipher deciphering not yet fully implemented in sandbox.');
-      }
-
-      if (!streamUrl) throw new Error('Stream URL is missing.');
-
-      console.log(`[AudioService] Playing ${quality} quality stream:`, streamUrl);
-
-      this.player = createAudioPlayer({
-        uri: streamUrl,
+      this.player = createAudioPlayer({ 
+        uri: result.url,
         headers: {
-          'User-Agent': userAgent
+          'User-Agent': result.userAgent
         }
       });
-      this.player.play();
-      usePlayerStore.getState().setIsPlaying(true);
       
+      this.player.volume = 1.0;
+      this.player.play();
+      
+      usePlayerStore.getState().setIsPlaying(true);
       ablySync.broadcastState();
 
-      // Track status manually since expo-audio might require a different callback mechanism
-      this.statusInterval = setInterval(() => {
-        if (this.player) {
-          usePlayerStore.getState().setPositionMs(this.player.currentTime * 1000);
-          usePlayerStore.getState().setDurationMs(this.player.duration * 1000);
-          
-          if (usePlayerStore.getState().isPlaying !== this.player.playing) {
-             usePlayerStore.getState().setIsPlaying(this.player.playing);
-             ablySync.broadcastState();
-          }
-          
-          if (this.player.currentTime >= this.player.duration && this.player.duration > 0) {
-            usePlayerStore.getState().playNext();
-          }
+      this.player.addListener('playbackStatusUpdate', (status) => {
+        if (!this.player) return;
+        const currentTime = this.player.currentTime || 0;
+        const duration = this.player.duration || 0;
+        const isPlaying = this.player.playing || false;
+
+        usePlayerStore.getState().setPositionMs(currentTime * 1000);
+        usePlayerStore.getState().setDurationMs(duration * 1000);
+
+        if (usePlayerStore.getState().isPlaying !== isPlaying) {
+          usePlayerStore.getState().setIsPlaying(isPlaying);
         }
-      }, 1000);
 
-    } catch (error) {
-      console.error('[AudioService] Playback Error:', error);
+        if (currentTime >= duration && duration > 0 && isPlaying) {
+          usePlayerStore.getState().playNext();
+        }
+      });
+
+    } catch (error: any) {
+      console.error('[AudioService] Playback Error:', error.message || error);
       usePlayerStore.getState().setIsPlaying(false);
-      ablySync.broadcastState();
     }
   }
 
@@ -80,7 +86,6 @@ export class AudioService {
     if (this.player) {
       this.player.pause();
       usePlayerStore.getState().setIsPlaying(false);
-      ablySync.broadcastState();
     }
   }
 
@@ -88,7 +93,6 @@ export class AudioService {
     if (this.player) {
       this.player.play();
       usePlayerStore.getState().setIsPlaying(true);
-      ablySync.broadcastState();
     }
   }
 }

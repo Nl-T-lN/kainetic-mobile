@@ -47,7 +47,6 @@ const WEB_CLIENT_PAYLOAD = {
   gl: 'US',
 };
 
-// Deep search helper to find all instances of a key in a JSON object
 function findKeys(obj: any, key: string, results: any[] = []) {
   if (typeof obj !== 'object' || obj === null) return;
   if (obj.hasOwnProperty(key)) {
@@ -62,10 +61,6 @@ function findKeys(obj: any, key: string, results: any[] = []) {
 }
 
 export class YouTubeSearchService {
-  /**
-   * Searches YouTube Music directly and parses the complex JSON AST
-   * into a clean SearchResult array.
-   */
   static async search(query: string, type: 'song' | 'artist' | 'album' | 'playlist' | 'all' = 'song'): Promise<SearchResult[]> {
     try {
       let params = '';
@@ -96,14 +91,10 @@ export class YouTubeSearchService {
       }
 
       const data = await response.json();
-      
-      // Extract all musicResponsiveListItemRenderer objects (the actual items)
-      const renderers = findKeys(data, 'musicResponsiveListItemRenderer');
-      
+      const renderers = findKeys(data, 'musicResponsiveListItemRenderer') || [];
       const results: SearchResult[] = [];
 
       for (const renderer of renderers) {
-        // 1. Extract ID
         let videoId = 
           renderer.playlistItemData?.videoId ||
           renderer.navigationEndpoint?.watchEndpoint?.videoId ||
@@ -111,51 +102,45 @@ export class YouTubeSearchService {
 
         let browseId = renderer.navigationEndpoint?.browseEndpoint?.browseId;
         
-        const id = type === 'song' ? videoId : browseId;
-        if (!id) continue; // Skip if we can't find a valid ID for the requested type
+        const id = (type === 'song' || type === 'all') ? videoId : browseId;
+        if (!id) continue;
 
-        // Filter out actual videos (UGC/Official Music Videos) to only return "Songs" (ATV)
-        const musicVideoType = 
-            renderer.overlay?.musicItemThumbnailOverlayRenderer?.content?.musicPlayButtonRenderer?.playNavigationEndpoint?.watchEndpoint?.watchEndpointMusicSupportedConfigs?.watchEndpointMusicConfig?.musicVideoType || 
-            renderer.navigationEndpoint?.watchEndpoint?.watchEndpointMusicSupportedConfigs?.watchEndpointMusicConfig?.musicVideoType;
-            
-        if (type === 'song' && musicVideoType && musicVideoType !== 'MUSIC_VIDEO_TYPE_ATV') {
-           continue;
+        // If type is 'all', determine the type from the browse endpoint or existence of videoId
+        let resultType = type;
+        if (type === 'all') {
+            if (browseId?.startsWith('UC')) resultType = 'artist';
+            else if (browseId?.startsWith('MPRE')) resultType = 'album';
+            else if (browseId?.startsWith('VL')) resultType = 'playlist';
+            else if (videoId) resultType = 'song';
+            else continue;
         }
 
-        // 2. Extract Title
         const titleRuns = renderer.flexColumns?.[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs;
         const title = titleRuns?.[0]?.text || 'Unknown Title';
 
-        // 3. Extract Subtitle (Artist / Info)
         const subtitleRuns = renderer.flexColumns?.[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs || [];
         let subtitle = 'Unknown';
         let durationMs = 0;
         
         if (subtitleRuns.length > 0) {
           subtitle = subtitleRuns.map((r: any) => r.text).join('').replace(/•/g, '').trim();
-          
-          // Try to extract duration from the last run if it looks like mm:ss
           const lastRunText = subtitleRuns[subtitleRuns.length - 1]?.text;
           if (lastRunText && /^\d+:\d{2}$/.test(lastRunText)) {
             const parts = lastRunText.split(':');
             durationMs = (parseInt(parts[0]) * 60 + parseInt(parts[1])) * 1000;
-            // Clean up subtitle by removing the duration and trailing separators
             subtitle = subtitle.replace(lastRunText, '').replace(/•/g, '').trim();
           }
         }
 
-        // 4. Extract Thumbnail
         const thumbnailUrl = getHighResThumbnail(renderer.thumbnail?.musicThumbnailRenderer?.thumbnail);
 
-        // Push to results
         results.push({
-          videoId: type === 'song' ? id : undefined,
-          id: type !== 'song' ? id : undefined,
+          videoId: videoId,
+          id: browseId,
           title: title,
           channelTitle: subtitle, 
           thumbnailUrl: thumbnailUrl,
-          type: type,
+          type: resultType as any,
           durationMs: durationMs,
         });
       }

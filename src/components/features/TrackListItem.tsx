@@ -18,6 +18,8 @@ function formatTime(ms: number) {
 }
 
 export default function TrackListItem({ track, isLoading, onPress, index }: TrackListItemProps) {
+  if (!track) return null;
+
   return (
     <TouchableOpacity 
       style={styles.container}
@@ -31,8 +33,8 @@ export default function TrackListItem({ track, isLoading, onPress, index }: Trac
       <Image source={{ uri: track.thumbnailUrl }} style={styles.thumbnail} />
       
       <View style={styles.trackInfo}>
-        <Text style={styles.title} numberOfLines={1}>{track.title}</Text>
-        <Text style={styles.artist} numberOfLines={1}>{track.artist}</Text>
+        <Text style={styles.title} numberOfLines={1}>{track.title || 'Unknown Title'}</Text>
+        <Text style={styles.artist} numberOfLines={1}>{track.artist || 'Unknown Artist'}</Text>
       </View>
 
       <View style={styles.actions}>
@@ -57,7 +59,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     padding: 8,
-    backgroundColor: 'transparent', // The parent handles background in chunks, but we can make it match here if used alone
+    backgroundColor: 'transparent', 
   },
   indexText: {
     color: '#888',

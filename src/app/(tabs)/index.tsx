@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator, useWindowDimensions, TouchableOpacity } from 'react-native';
 import { useRouter } from 'expo-router';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
@@ -15,13 +15,12 @@ export default function HomeTab() {
   const router = useRouter();
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const setQueue = usePlayerStore((state) => state.setQueue);
+  const addRecentTrack = useLibraryStore((state) => state.addRecentTrack);
   const recentTracks = useLibraryStore((state) => state.recentTracks) || [];
   
   const [sections, setSections] = useState<HomeSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
-
-
 
   useEffect(() => {
     async function loadHome() {
@@ -46,35 +45,50 @@ export default function HomeTab() {
     loadHome();
   }, []);
 
-  const handlePlayTrack = async (item: SearchResult, list: SearchResult[]) => {
+  const handlePlayTrack = async (item: SearchResult | Track, list: (SearchResult | Track)[]) => {
     try {
-      if (item.type !== 'song' || !item.videoId) {
-        if (item.type === 'playlist') router.push(`/playlist/${item.id}`);
-        else if (item.type === 'album') router.push(`/album/${item.id}`);
-        else if (item.type === 'artist') router.push(`/artist/${item.id}`);
-        return;
+      const isSearchResult = 'type' in item;
+      const videoId = isSearchResult ? (item as SearchResult).videoId : (item as Track).videoId;
+
+      if (isSearchResult) {
+        const searchItem = item as SearchResult;
+        if (searchItem.type !== 'song' || !videoId) {
+           if (searchItem.type === 'playlist') router.push(`/playlist/${searchItem.id}`);
+           else if (searchItem.type === 'album') router.push(`/album/${searchItem.id}`);
+           else if (searchItem.type === 'artist') router.push(`/artist/${searchItem.id}`);
+           return;
+        }
       }
       
-      setLoadingTrackId(item.videoId);
+      setLoadingTrackId(videoId!);
       
       const mappedQueue: Track[] = list
-        .filter(t => t.type === 'song' && t.videoId)
-        .map(t => ({
-            videoId: t.videoId!,
-            title: t.title,
-            artist: t.channelTitle,
-            thumbnailUrl: t.thumbnailUrl,
-            durationMs: t.durationMs || 0
-        }));
+        .map(t => {
+            if ('type' in t) {
+                const st = t as SearchResult;
+                if (st.type !== 'song' || !st.videoId) return null;
+                return {
+                    videoId: st.videoId!,
+                    title: st.title,
+                    artist: st.channelTitle || 'Unknown Artist',
+                    thumbnailUrl: st.thumbnailUrl,
+                    durationMs: st.durationMs || 0
+                };
+            }
+            return t as Track;
+        })
+        .filter((t): t is Track => t !== null);
         
-      const index = mappedQueue.findIndex(t => t.videoId === item.videoId);
+      const index = mappedQueue.findIndex(t => t.videoId === videoId);
+      const selectedTrack = mappedQueue[index >= 0 ? index : 0];
       
       setQueue(mappedQueue, index >= 0 ? index : 0);
-      setCurrentTrack(mappedQueue[index >= 0 ? index : 0]);
-      await AudioService.playTrack(item.videoId);
+      setCurrentTrack(selectedTrack);
+      addRecentTrack(selectedTrack);
+      
+      await AudioService.playTrack(videoId!);
     } catch (error) {
       console.error("Playback failed:", error);
-      alert("Failed to extract or play this track.");
     } finally {
       setLoadingTrackId(null);
     }
@@ -87,7 +101,6 @@ export default function HomeTab() {
     const isArtistSection = section.items[0]?.type === 'artist' || section.title.toLowerCase().includes('artist');
 
     if (isSongSection) {
-      // Chunk items into groups of 4 for the horizontal grid
       const chunkSize = 4;
       const chunks = [];
       for (let i = 0; i < section.items.length; i += chunkSize) {
@@ -110,7 +123,7 @@ export default function HomeTab() {
                       track={{
                           videoId: item.videoId || item.id || '',
                           title: item.title,
-                          artist: item.channelTitle,
+                          artist: item.channelTitle || 'Unknown Artist',
                           thumbnailUrl: item.thumbnailUrl,
                           durationMs: item.durationMs || 0,
                       }}
@@ -140,7 +153,7 @@ export default function HomeTab() {
                 track={{
                     videoId: item.videoId || item.id || '',
                     title: item.title,
-                    artist: item.channelTitle,
+                    artist: item.channelTitle || 'Unknown Artist',
                     thumbnailUrl: item.thumbnailUrl,
                     durationMs: item.durationMs || 0,
                 }}
@@ -173,11 +186,7 @@ export default function HomeTab() {
                       key={track.videoId + '-recent'}
                       track={track}
                       isLoading={loadingTrackId === track.videoId}
-                      onPress={() => {
-                          setQueue(recentTracks, index);
-                          setCurrentTrack(track);
-                          AudioService.playTrack(track.videoId);
-                      }}
+                      onPress={() => handlePlayTrack(track, recentTracks)}
                     />
                   ))}
                 </ScrollView>
