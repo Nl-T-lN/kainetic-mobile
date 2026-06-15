@@ -5,6 +5,7 @@ import { ablySync } from './AblyService';
 
 export class AudioService {
   private static player: AudioPlayer | null = null;
+  private static unsubscribeStore: (() => void) | null = null;
 
   static async init() {
     try {
@@ -16,8 +17,13 @@ export class AudioService {
       });
       console.log('[AudioService] Audio mode configured successfully');
 
+      // Unsubscribe previous if exists
+      if (this.unsubscribeStore) {
+        this.unsubscribeStore();
+      }
+
       // Subscribe to Zustand store changes purely outside of React
-      usePlayerStore.subscribe((state, prevState) => {
+      this.unsubscribeStore = usePlayerStore.subscribe((state, prevState) => {
         if (state.currentTrack?.videoId !== prevState.currentTrack?.videoId) {
           if (state.currentTrack) {
             this.playTrack(state.currentTrack.videoId);

@@ -130,6 +130,17 @@ export default function SearchTab() {
       setQueue([mappedTrack], 0);
       setCurrentTrack(mappedTrack);
 
+      // Fetch Up Next tracks in the background
+      YouTubeSearchService.getUpNext(mappedTrack.videoId).then(upNextTracks => {
+        if (upNextTracks.length > 0) {
+           const currentStore = usePlayerStore.getState();
+           // Only update queue if the user is still playing the same track
+           if (currentStore.currentTrack?.videoId === mappedTrack.videoId) {
+              setQueue([mappedTrack, ...upNextTracks], 0);
+           }
+        }
+      }).catch(console.error);
+
     } catch (error) {
       console.error("Playback failed:", error);
       alert("Failed to extract or play this track.");

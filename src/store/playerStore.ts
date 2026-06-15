@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useLibraryStore } from './libraryStore';
 import type { Track } from '@/types/music';
 
 interface PlayerStoreState {
@@ -29,7 +30,12 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   isPlaying: false,
   audioQuality: 'HIGH', // Default to high as requested
 
-  setCurrentTrack: (track) => set({ currentTrack: track }),
+  setCurrentTrack: (track) => {
+    set({ currentTrack: track });
+    if (track) {
+      useLibraryStore.getState().addRecentTrack(track);
+    }
+  },
   
   setQueue: (queue, index = 0) => set({ 
     queue, 

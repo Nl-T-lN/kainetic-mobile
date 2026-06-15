@@ -1,4 +1,4 @@
-import { SearchResult } from '@/types/music';
+import { SearchResult, Track } from '@/types/music';
 
 export function getHighResThumbnail(thumbnails: any): string {
   if (!thumbnails) return "";
@@ -123,12 +123,15 @@ export class YouTubeSearchService {
         let durationMs = 0;
         
         if (subtitleRuns.length > 0) {
-          subtitle = subtitleRuns.map((r: any) => r.text).join('').replace(/•/g, '').trim();
-          const lastRunText = subtitleRuns[subtitleRuns.length - 1]?.text;
-          if (lastRunText && /^\d+:\d{2}$/.test(lastRunText)) {
-            const parts = lastRunText.split(':');
-            durationMs = (parseInt(parts[0]) * 60 + parseInt(parts[1])) * 1000;
-            subtitle = subtitle.replace(lastRunText, '').replace(/•/g, '').trim();
+          const rawSubtitle = subtitleRuns.map((r: any) => r.text).join('');
+          // Try to extract time at the end: "Artist • Album • 3:45"
+          const match = rawSubtitle.match(/(.*?)\s*•\s*(\d+:\d{2})$/);
+          if (match) {
+            subtitle = match[1].trim();
+            const timeParts = match[2].split(':');
+            durationMs = (parseInt(timeParts[0]) * 60 + parseInt(timeParts[1])) * 1000;
+          } else {
+            subtitle = rawSubtitle;
           }
         }
 
@@ -149,6 +152,64 @@ export class YouTubeSearchService {
 
     } catch (error) {
       console.error('[YouTubeSearchService] Error:', error);
+      return [];
+    }
+  }
+
+  static async getUpNext(videoId: string): Promise<Track[]> {
+    try {
+      const response = await fetch('https://music.youtube.com/youtubei/v1/next', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
+          'Origin': 'https://music.youtube.com',
+        },
+        body: JSON.stringify({
+          context: { client: WEB_CLIENT_PAYLOAD },
+          videoId: videoId,
+          playlistId: "RDAMVM" + videoId
+        }),
+      });
+
+      if (!response.ok) return [];
+
+      const data = await response.json();
+      const renderers = findKeys(data, 'playlistPanelVideoRenderer') || [];
+      const tracks: Track[] = [];
+
+      for (const renderer of renderers) {
+        if (!renderer.videoId) continue;
+        
+        const titleRuns = renderer.title?.runs || [];
+        const title = titleRuns.map((r: any) => r.text).join('') || 'Unknown Title';
+        
+        const subtitleRuns = renderer.longBylineText?.runs || [];
+        let artist = 'Unknown Artist';
+        if (subtitleRuns.length > 0) {
+           artist = subtitleRuns.map((r: any) => r.text).join('');
+        }
+        
+        let durationMs = 0;
+        const lengthText = renderer.lengthText?.runs?.[0]?.text;
+        if (lengthText && /^\d+:\d{2}$/.test(lengthText)) {
+            const parts = lengthText.split(':');
+            durationMs = (parseInt(parts[0]) * 60 + parseInt(parts[1])) * 1000;
+        }
+
+        tracks.push({
+          videoId: renderer.videoId,
+          title,
+          artist,
+          thumbnailUrl: getHighResThumbnail(renderer.thumbnail),
+          durationMs
+        });
+      }
+
+      // Filter out the seed track if it's the first one
+      return tracks.filter(t => t.videoId !== videoId);
+    } catch (e) {
+      console.error('[YouTubeSearchService] getUpNext Error:', e);
       return [];
     }
   }

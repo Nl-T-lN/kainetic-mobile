@@ -26,31 +26,32 @@ export default function HomeTab() {
   useEffect(() => {
     async function loadHome() {
       try {
+        const homeSections = await YouTubeHomeService.fetchHome();
+        
+        // Generate proper Quick Picks
+        let quickPicksTracks = [];
         const recentTracks = useLibraryStore.getState().recentTracks || [];
-        let searchQuery = "Top Pop Hits 2024";
-        if (recentTracks.length > 0) {
-          const artists = Array.from(new Set(recentTracks.map(t => t.artist).filter(Boolean))).slice(0, 2);
-          if (artists.length > 0) {
-            searchQuery = `${artists.join(', ')} best songs`;
-          }
+        if (recentTracks.length > 0 && recentTracks[0].videoId) {
+           quickPicksTracks = await YouTubeSearchService.getUpNext(recentTracks[0].videoId);
+        } else {
+           // Fallback to "Blinding Lights" Up Next for a great generic mix
+           quickPicksTracks = await YouTubeSearchService.getUpNext('fHI8X4OXluQ');
         }
 
-        const [homeSections, searchSongs] = await Promise.all([
-          YouTubeHomeService.fetchHome(),
-          YouTubeSearchService.search(searchQuery, "song")
-        ]);
-        
         const filteredSections = homeSections.filter(s => 
           !s.title.toLowerCase().includes('quick picks') && 
           !s.title.toLowerCase().includes('recommend')
         );
 
         const newSections: HomeSection[] = [];
-        
-        if (searchSongs && searchSongs.length > 0) {
+        if (quickPicksTracks && quickPicksTracks.length > 0) {
           newSections.push({
             title: "Quick Picks",
-            items: searchSongs.slice(0, 20) // 20 songs total
+            items: quickPicksTracks.slice(0, 20).map(t => ({
+              ...t,
+              id: t.videoId,
+              type: 'song'
+            })) as any
           });
         }
 
