@@ -1,21 +1,38 @@
-import { createAudioPlayer, AudioPlayer, setAudioModeAsync } from 'expo-audio';
+import TrackPlayer, { Capability, Event, State, AppKilledPlaybackBehavior } from 'react-native-track-player';
 import { usePlayerStore } from '@/store/playerStore';
 import { InnerTubeService } from './InnerTubeService';
 import { ablySync } from './AblyService';
 
 export class AudioService {
-  private static player: AudioPlayer | null = null;
   private static unsubscribeStore: (() => void) | null = null;
+  private static progressInterval: ReturnType<typeof setInterval> | null = null;
+  private static isSetup = false;
 
   static async init() {
+    if (this.isSetup) return;
     try {
-      await setAudioModeAsync({
-        playsInSilentMode: true,
-        interruptionMode: 'duckOthers',
-        shouldPlayInBackground: true,
-        allowsRecording: false,
+      await TrackPlayer.setupPlayer();
+      await TrackPlayer.updateOptions({
+        android: {
+          appKilledPlaybackBehavior: AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification
+        },
+        capabilities: [
+          Capability.Play,
+          Capability.Pause,
+          Capability.SkipToNext,
+          Capability.SkipToPrevious,
+          Capability.SeekTo,
+        ],
+        notificationCapabilities: [
+          Capability.Play,
+          Capability.Pause,
+          Capability.SkipToNext,
+          Capability.SkipToPrevious,
+        ],
       });
-      console.log('[AudioService] Audio mode configured successfully');
+      
+      this.isSetup = true;
+      console.log('[AudioService] TrackPlayer configured successfully');
 
       // Unsubscribe previous if exists
       if (this.unsubscribeStore) {
@@ -33,22 +50,46 @@ export class AudioService {
         }
       });
 
+      TrackPlayer.addEventListener(Event.PlaybackState, async (event: any) => {
+        if (event.state === State.Playing) {
+          usePlayerStore.getState().setIsPlaying(true);
+          this.startProgressTracker();
+        } else {
+          usePlayerStore.getState().setIsPlaying(false);
+          this.stopProgressTracker();
+        }
+        
+        if (event.state === State.Ended) {
+            usePlayerStore.getState().playNext();
+        }
+      });
+
     } catch (e) {
-      console.error('[AudioService] Failed to set audio mode:', e);
+      console.error('[AudioService] Failed to init TrackPlayer:', e);
+    }
+  }
+
+  private static startProgressTracker() {
+    if (this.progressInterval) clearInterval(this.progressInterval);
+    this.progressInterval = setInterval(async () => {
+      const progress = await TrackPlayer.getProgress();
+      usePlayerStore.getState().setPositionMs(progress.position * 1000);
+      usePlayerStore.getState().setDurationMs(progress.duration * 1000);
+    }, 1000);
+  }
+
+  private static stopProgressTracker() {
+    if (this.progressInterval) {
+      clearInterval(this.progressInterval);
+      this.progressInterval = null;
     }
   }
 
   static async playTrack(videoId: string) {
     try {
-      if (this.player) {
-        try {
-          this.player.pause();
-          this.player.remove();
-        } catch (e) {}
-        this.player = null;
-      }
-
-      const quality = usePlayerStore.getState().audioQuality;
+      const state = usePlayerStore.getState();
+      const currentTrack = state.currentTrack;
+      const quality = state.audioQuality;
 
       console.log(`[AudioService] Requesting extraction for ${videoId}...`);
       
@@ -63,36 +104,19 @@ export class AudioService {
 
       console.log(`[AudioService] Success! Received URL: ${result.url.substring(0, 50)}...`);
 
-      this.player = createAudioPlayer({ 
-        uri: result.url,
-        headers: {
-          'User-Agent': result.userAgent
-        }
+      await TrackPlayer.reset();
+      await TrackPlayer.add({
+        id: videoId,
+        url: result.url,
+        title: currentTrack?.title || 'Unknown Title',
+        artist: currentTrack?.artist || 'Unknown Artist',
+        artwork: currentTrack?.thumbnailUrl,
+        userAgent: result.userAgent
       });
       
-      this.player.volume = 1.0;
-      this.player.play();
+      await TrackPlayer.play();
       
-      usePlayerStore.getState().setIsPlaying(true);
       ablySync.broadcastState();
-
-      this.player.addListener('playbackStatusUpdate', (status) => {
-        if (!this.player) return;
-        const currentTime = this.player.currentTime || 0;
-        const duration = this.player.duration || 0;
-        const isPlaying = this.player.playing || false;
-
-        usePlayerStore.getState().setPositionMs(currentTime * 1000);
-        usePlayerStore.getState().setDurationMs(duration * 1000);
-
-        if (usePlayerStore.getState().isPlaying !== isPlaying) {
-          usePlayerStore.getState().setIsPlaying(isPlaying);
-        }
-
-        if (currentTime >= duration && duration > 0 && isPlaying) {
-          usePlayerStore.getState().playNext();
-        }
-      });
 
     } catch (error: any) {
       console.error('[AudioService] Playback Error:', error.message || error);
@@ -101,16 +125,14 @@ export class AudioService {
   }
 
   static async pause() {
-    if (this.player) {
-      this.player.pause();
-      usePlayerStore.getState().setIsPlaying(false);
-    }
+    await TrackPlayer.pause();
   }
 
   static async resume() {
-    if (this.player) {
-      this.player.play();
-      usePlayerStore.getState().setIsPlaying(true);
-    }
+    await TrackPlayer.play();
+  }
+
+  static async seekTo(ms: number) {
+    await TrackPlayer.seekTo(ms / 1000);
   }
 }

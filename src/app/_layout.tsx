@@ -5,6 +5,10 @@ import { View, StyleSheet } from 'react-native';
 import MiniPlayer from '@/components/features/MiniPlayer';
 import { AudioService } from '@/services/AudioService';
 import { useEffect } from 'react';
+import TrackPlayer from 'react-native-track-player';
+import { PlaybackService } from '@/services/playbackService';
+
+TrackPlayer.registerPlaybackService(() => PlaybackService);
 
 export default function RootLayout() {
   useEffect(() => {

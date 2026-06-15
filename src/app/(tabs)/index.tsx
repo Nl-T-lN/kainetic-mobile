@@ -17,7 +17,6 @@ export default function HomeTab() {
   const { width } = useWindowDimensions();
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const setQueue = usePlayerStore((state) => state.setQueue);
-  const addRecentTrack = useLibraryStore((state) => state.addRecentTrack);
   const recentTracks = useLibraryStore((state) => state.recentTracks) || [];
   
   const [sections, setSections] = useState<HomeSection[]>([]);
@@ -26,17 +25,13 @@ export default function HomeTab() {
   useEffect(() => {
     async function loadHome() {
       try {
-        const homeSections = await YouTubeHomeService.fetchHome();
-        
-        // Generate proper Quick Picks
-        let quickPicksTracks = [];
-        const recentTracks = useLibraryStore.getState().recentTracks || [];
-        if (recentTracks.length > 0 && recentTracks[0].videoId) {
-           quickPicksTracks = await YouTubeSearchService.getUpNext(recentTracks[0].videoId);
-        } else {
-           // Fallback to "Blinding Lights" Up Next for a great generic mix
-           quickPicksTracks = await YouTubeSearchService.getUpNext('fHI8X4OXluQ');
-        }
+        const stateRecentTracks = useLibraryStore.getState().recentTracks || [];
+        const quickPicksSeed = (stateRecentTracks.length > 0 && stateRecentTracks[0].videoId) ? stateRecentTracks[0].videoId : 'fHI8X4OXluQ';
+
+        const [homeSections, quickPicksTracks] = await Promise.all([
+          YouTubeHomeService.fetchHome(),
+          YouTubeSearchService.getUpNext(quickPicksSeed)
+        ]);
 
         const filteredSections = homeSections.filter(s => 
           !s.title.toLowerCase().includes('quick picks') && 
@@ -102,7 +97,6 @@ export default function HomeTab() {
       
       setQueue(mappedQueue, index >= 0 ? index : 0);
       setCurrentTrack(selectedTrack);
-      addRecentTrack(selectedTrack);
     } catch (error) {
       console.error("Playback failed:", error);
     }
