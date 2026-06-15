@@ -3,7 +3,11 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react
 import { usePlayerStore } from '@/store/playerStore';
 import { AudioService } from '@/services/AudioService';
 
-export default function QueueTab() {
+interface QueueTabProps {
+  onScroll?: (event: any) => void;
+}
+
+export default function QueueTab({ onScroll }: QueueTabProps) {
   const queue = usePlayerStore((state) => state.queue);
   const queueIndex = usePlayerStore((state) => state.queueIndex);
   const setQueue = usePlayerStore((state) => state.setQueue);
@@ -48,6 +52,8 @@ export default function QueueTab() {
           )}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 40 }}
+          onScroll={onScroll}
+          scrollEventThrottle={16}
         />
       )}
     </View>

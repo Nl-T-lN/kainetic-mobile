@@ -26,8 +26,35 @@ export default function HomeTab() {
   useEffect(() => {
     async function loadHome() {
       try {
-        const homeSections = await YouTubeHomeService.fetchHome();
-        setSections(homeSections);
+        const recentTracks = useLibraryStore.getState().recentTracks || [];
+        let searchQuery = "Top Pop Hits 2024";
+        if (recentTracks.length > 0) {
+          const artists = Array.from(new Set(recentTracks.map(t => t.artist).filter(Boolean))).slice(0, 2);
+          if (artists.length > 0) {
+            searchQuery = `${artists.join(', ')} best songs`;
+          }
+        }
+
+        const [homeSections, searchSongs] = await Promise.all([
+          YouTubeHomeService.fetchHome(),
+          YouTubeSearchService.search(searchQuery, "song")
+        ]);
+        
+        const filteredSections = homeSections.filter(s => 
+          !s.title.toLowerCase().includes('quick picks') && 
+          !s.title.toLowerCase().includes('recommend')
+        );
+
+        const newSections: HomeSection[] = [];
+        
+        if (searchSongs && searchSongs.length > 0) {
+          newSections.push({
+            title: "Quick Picks",
+            items: searchSongs.slice(0, 20) // 20 songs total
+          });
+        }
+
+        setSections([...newSections, ...filteredSections]);
       } catch (err) {
         console.error('Failed to load home', err);
       } finally {

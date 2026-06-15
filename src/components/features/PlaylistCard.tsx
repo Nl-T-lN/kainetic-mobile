@@ -8,11 +8,12 @@ interface PlaylistCardProps {
   subtitle?: string;
   thumbnailUrl: string;
   onPress: () => void;
+  style?: any;
 }
 
-export function PlaylistCard({ title, subtitle, thumbnailUrl, onPress }: PlaylistCardProps) {
+export function PlaylistCard({ title, subtitle, thumbnailUrl, onPress, style }: PlaylistCardProps) {
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity style={[styles.card, style]} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.imageContainer}>
         <Image source={{ uri: thumbnailUrl }} style={styles.image} />
         {/* PlayOverlay can be shown by default or only on tap in mobile, let's keep it simple for now without hover states */}

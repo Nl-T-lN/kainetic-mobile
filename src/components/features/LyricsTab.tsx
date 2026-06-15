@@ -3,7 +3,11 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-nat
 import { usePlayerStore } from '@/store/playerStore';
 import { useLyrics } from '@/hooks/useLyrics';
 
-export default function LyricsTab() {
+interface LyricsTabProps {
+  onScroll?: (event: any) => void;
+}
+
+export default function LyricsTab({ onScroll }: LyricsTabProps) {
   const currentTrack = usePlayerStore((state) => state.currentTrack);
   const positionMs = usePlayerStore((state) => state.positionMs);
   const { lyrics, plainLyrics, isLoading } = useLyrics(currentTrack);
@@ -52,6 +56,8 @@ export default function LyricsTab() {
         style={styles.container} 
         contentContainerStyle={styles.contentContainer}
         showsVerticalScrollIndicator={false}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
       >
         {lyrics.map((line, index) => {
           const isActive = index === activeIndex;
@@ -79,6 +85,8 @@ export default function LyricsTab() {
     <ScrollView 
       style={styles.container} 
       contentContainerStyle={styles.contentContainer}
+      onScroll={onScroll}
+      scrollEventThrottle={16}
     >
       <Text style={styles.plainLyrics}>{plainLyrics}</Text>
     </ScrollView>

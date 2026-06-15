@@ -29,7 +29,7 @@ export default function MiniPlayer() {
   return (
     <>
       <View style={styles.wrapper}>
-        <BlurView intensity={80} tint="dark" style={styles.container}>
+        <BlurView intensity={95} tint="dark" style={styles.container}>
           <TouchableOpacity 
             style={styles.trackInfo} 
             activeOpacity={0.8}
@@ -97,11 +97,11 @@ export default function MiniPlayer() {
 const styles = StyleSheet.create({
   wrapper: {
     position: 'absolute',
-    bottom: 85, // Above the tab bar
-    left: 8,
-    right: 8,
+    bottom: 84, // Adjust to sit flush on top of the tab bar
+    left: 0,
+    right: 0,
     height: 64,
-    borderRadius: 12,
+    borderRadius: 0, // Flush
     overflow: 'hidden',
     backgroundColor: 'transparent',
   },
@@ -109,9 +109,11 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
+    paddingHorizontal: 16, // Slightly more padding since it touches edges
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.08)', // slightly more visible
+    backgroundColor: 'rgba(255, 255, 255, 0.04)', // Lighter for premium glassmorphism
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(255, 255, 255, 0.1)',
   },
   trackInfo: {
     flex: 1,

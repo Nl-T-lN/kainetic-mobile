@@ -24,6 +24,7 @@ const RECENT_SEARCHES_KEY = '@kainetic_recent_searches';
 export default function SearchTab() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
+  const [submittedQuery, setSubmittedQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('song');
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
@@ -38,8 +39,8 @@ export default function SearchTab() {
   }, []);
 
   useEffect(() => {
-    if (searchQuery.trim()) {
-      handleSearch(searchQuery);
+    if (submittedQuery.trim()) {
+      handleSearch(submittedQuery);
     }
   }, [activeFilter]);
 
@@ -76,12 +77,14 @@ export default function SearchTab() {
   const executeSearch = () => {
     if (searchQuery.trim()) {
       saveRecentSearch(searchQuery.trim());
+      setSubmittedQuery(searchQuery.trim());
       handleSearch(searchQuery);
     }
   };
 
   const handleRecentSearchClick = (query: string) => {
     setSearchQuery(query);
+    setSubmittedQuery(query);
     handleSearch(query);
   };
 
@@ -154,12 +157,18 @@ export default function SearchTab() {
           placeholderTextColor="#888"
           returnKeyType="search"
           value={searchQuery}
-          onChangeText={setSearchQuery}
+          onChangeText={(text) => {
+            setSearchQuery(text);
+            if (text.trim() !== submittedQuery && searchResults.length > 0) {
+              setSearchResults([]);
+              setSubmittedQuery('');
+            }
+          }}
           onSubmitEditing={executeSearch}
           autoFocus
         />
         {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => { setSearchQuery(''); setSearchResults([]); }}>
+          <TouchableOpacity onPress={() => { setSearchQuery(''); setSubmittedQuery(''); setSearchResults([]); }}>
             <X color="#888" size={20} />
           </TouchableOpacity>
         )}
@@ -167,7 +176,7 @@ export default function SearchTab() {
 
       <ScrollView contentContainerStyle={styles.content}>
         
-        {searchQuery.trim().length === 0 ? (
+        {searchResults.length === 0 && !isSearching ? (
           // Empty State: Recent Searches
           <View style={styles.recentContainer}>
             <View style={styles.recentHeader}>
@@ -198,8 +207,6 @@ export default function SearchTab() {
         ) : (
           // Active Search State
           <>
-            <Text style={styles.resultsTitle}>Search Results for &quot;{searchQuery}&quot;</Text>
-            
             {/* Filter Tabs */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersWrapper} contentContainerStyle={styles.filtersContainer}>
               {FILTERS.map(filter => (
@@ -224,14 +231,14 @@ export default function SearchTab() {
                 // List Layout for Tracks
                 <View style={styles.trackListContainer}>
                   <TrackList 
-                    tracks={mappedTracksForList} 
+                    tracks={mappedTracksForList.filter(t => searchResults.find(r => r.videoId === t.videoId)?.type === 'song')} 
                     onTrackSelect={handlePlayTrack} 
                   />
                 </View>
               ) : (
                 // Grid Layout for Albums, Artists, Playlists
                 <View style={styles.resultsGrid}>
-                  {searchResults.map((result, i) => (
+                  {searchResults.filter(r => r.type === activeFilter).map((result, i) => (
                     <View key={result.videoId || result.id || i} style={styles.resultItem}>
                       {activeFilter === 'artist' ? (
                         <ArtistCard
@@ -239,6 +246,7 @@ export default function SearchTab() {
                           name={result.channelTitle || result.title || "Artist"}
                           thumbnailUrl={result.thumbnailUrl}
                           onPress={() => result.id && router.push(`/artist/${result.id}`)}
+                          style={{ width: '100%', marginRight: 0 }}
                         />
                       ) : (
                         <PlaylistCard
@@ -247,6 +255,7 @@ export default function SearchTab() {
                           subtitle={result.channelTitle}
                           thumbnailUrl={result.thumbnailUrl}
                           onPress={() => handlePlayTrack(result, i)}
+                          style={{ width: '100%', marginRight: 0 }}
                         />
                       )}
                     </View>
@@ -336,28 +345,33 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   filtersWrapper: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
     marginBottom: 20,
   },
   filtersContainer: {
-    paddingHorizontal: 16,
-    gap: 12,
+    paddingHorizontal: 8,
+    gap: 8,
   },
   filterChip: {
     paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+    backgroundColor: 'transparent',
+    borderRadius: 0,
   },
   activeFilterChip: {
-    backgroundColor: '#fff',
+    backgroundColor: 'transparent',
+    borderBottomColor: '#fff',
   },
   filterText: {
-    color: '#fff',
-    fontSize: 14,
+    color: '#888',
+    fontSize: 15,
     fontWeight: '600',
   },
   activeFilterText: {
-    color: '#000',
+    color: '#fff',
   },
   trackListContainer: {
     paddingHorizontal: 8,
@@ -366,10 +380,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 16,
+    justifyContent: 'space-between',
+    gap: 0, // Using percentage width and space-between instead of gap
   },
   resultItem: {
-    marginBottom: 8,
+    width: '47%', // roughly half the screen, leaving room for space-between
+    marginBottom: 24,
   },
   centerContainer: {
     flex: 1,

@@ -6,11 +6,12 @@ interface ArtistCardProps {
   name: string;
   thumbnailUrl: string;
   onPress: () => void;
+  style?: any;
 }
 
-export function ArtistCard({ name, thumbnailUrl, onPress }: ArtistCardProps) {
+export function ArtistCard({ name, thumbnailUrl, onPress, style }: ArtistCardProps) {
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity style={[styles.card, style]} onPress={onPress} activeOpacity={0.8}>
       <Image source={{ uri: thumbnailUrl }} style={styles.image} />
       <Text style={styles.name} numberOfLines={1}>{name}</Text>
     </TouchableOpacity>

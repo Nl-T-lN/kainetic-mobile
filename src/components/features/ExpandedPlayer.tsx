@@ -1,14 +1,18 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Dimensions } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, Dimensions, Platform, UIManager, LayoutAnimation, Animated, PanResponder } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ChevronDown, Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, MoreVertical } from 'lucide-react-native';
+import { ChevronDown, Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, MoreVertical, MessageSquare, ListMusic } from 'lucide-react-native';
 import { BlurView } from 'expo-blur';
 import { usePlayerStore } from '@/store/playerStore';
 import { AudioService } from '@/services/AudioService';
 import LyricsTab from './LyricsTab';
 import QueueTab from './QueueTab';
 
-const { width, height } = Dimensions.get('window');
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const { width } = Dimensions.get('window');
 const ARTWORK_SIZE = width - 64;
 
 const formatTime = (ms: number) => {
@@ -19,13 +23,78 @@ const formatTime = (ms: number) => {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
+const CustomProgressBar = ({ positionMs, durationMs, onSeek }: { positionMs: number, durationMs: number, onSeek: (ms: number) => void }) => {
+  const [sliderWidth, setSliderWidth] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragValue, setDragValue] = useState(0);
+  
+  const dragStartParams = useRef({ startX: 0, startMs: 0 });
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderGrant: (evt) => {
+        setIsDragging(true);
+        const x = evt.nativeEvent.locationX;
+        if (sliderWidth > 0) {
+           const p = Math.max(0, Math.min(1, x / sliderWidth));
+           setDragValue(p * durationMs);
+           dragStartParams.current = { startX: evt.nativeEvent.pageX, startMs: p * durationMs };
+        }
+      },
+      onPanResponderMove: (evt, gestureState) => {
+        if (sliderWidth > 0) {
+           const msDelta = (gestureState.dx / sliderWidth) * durationMs;
+           const newMs = Math.max(0, Math.min(durationMs, dragStartParams.current.startMs + msDelta));
+           setDragValue(newMs);
+        }
+      },
+      onPanResponderRelease: (evt, gestureState) => {
+        setIsDragging(false);
+        if (sliderWidth > 0) {
+           const msDelta = (gestureState.dx / sliderWidth) * durationMs;
+           const newMs = Math.max(0, Math.min(durationMs, dragStartParams.current.startMs + msDelta));
+           onSeek(newMs);
+        }
+      },
+      onPanResponderTerminate: () => {
+        setIsDragging(false);
+      }
+    })
+  ).current;
+
+  const currentMs = isDragging ? dragValue : positionMs;
+  const percent = durationMs > 0 ? (currentMs / durationMs) * 100 : 0;
+
+  return (
+    <View style={styles.progressBarPlaceholder}>
+      <View 
+        style={styles.progressTrackContainer} 
+        onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
+        {...panResponder.panHandlers}
+      >
+        <View style={styles.progressTrack}>
+          <View style={[styles.progressFill, { width: `${percent}%` }]} />
+        </View>
+        <View style={[styles.progressThumb, { left: `${percent}%` }]} />
+      </View>
+      <View style={styles.timeRow}>
+        <Text style={styles.timeText}>{formatTime(currentMs)}</Text>
+        <Text style={styles.timeText}>-{formatTime(durationMs - currentMs)}</Text>
+      </View>
+    </View>
+  );
+};
+
 interface ExpandedPlayerProps {
   isVisible: boolean;
   onClose: () => void;
+  panHandlers?: any;
 }
 
-export default function ExpandedPlayer({ isVisible, onClose }: ExpandedPlayerProps) {
-  const [activeTab, setActiveTab] = React.useState<'LYRICS' | 'QUEUE' | null>(null);
+export default function ExpandedPlayer({ isVisible, onClose, panHandlers }: ExpandedPlayerProps) {
+  const [activeTab, setActiveTab] = useState<'LYRICS' | 'QUEUE' | null>(null);
   
   const currentTrack = usePlayerStore((state) => state.currentTrack);
   const isPlaying = usePlayerStore((state) => state.isPlaying);
@@ -34,9 +103,28 @@ export default function ExpandedPlayer({ isVisible, onClose }: ExpandedPlayerPro
   const positionMs = usePlayerStore((state) => state.positionMs);
   const durationMs = usePlayerStore((state) => state.durationMs);
 
-  if (!currentTrack) return null;
+  const controlsOpacity = useRef(new Animated.Value(1)).current;
+  const lastScrollY = useRef(0);
 
-  const progressPercent = durationMs > 0 ? (positionMs / durationMs) * 100 : 0;
+  const handleTabChange = (tab: 'LYRICS' | 'QUEUE' | null) => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setActiveTab(tab);
+    // Reset opacity instantly when changing views
+    Animated.spring(controlsOpacity, { toValue: 1, useNativeDriver: true }).start();
+  };
+
+  const handleScroll = (event: any) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    
+    if (currentY <= 0) {
+       Animated.spring(controlsOpacity, { toValue: 1, useNativeDriver: true }).start();
+    } else if (currentY > lastScrollY.current + 5) {
+       Animated.spring(controlsOpacity, { toValue: 0, useNativeDriver: true }).start();
+    } else if (currentY < lastScrollY.current - 5) {
+       Animated.spring(controlsOpacity, { toValue: 1, useNativeDriver: true }).start();
+    }
+    lastScrollY.current = currentY;
+  };
 
   const togglePlayPause = async () => {
     try {
@@ -50,121 +138,109 @@ export default function ExpandedPlayer({ isVisible, onClose }: ExpandedPlayerPro
     }
   };
 
-  return (
-    <Modal
-      visible={isVisible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.container}>
-        {/* Background Artwork Blur */}
-        <Image 
-          source={{ uri: currentTrack.thumbnailUrl }} 
-          style={styles.backgroundImage} 
-          blurRadius={50} 
-        />
-        <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
+  const handleSeek = (ms: number) => {
+    AudioService.seekTo(ms);
+  };
 
-        <SafeAreaView style={styles.safeArea}>
-          {/* Header */}
-          <View style={styles.header}>
+  if (!currentTrack) return null;
+
+  return (
+    <View style={[styles.container, { display: isVisible ? 'flex' : 'none' }]}>
+      {/* Background Artwork Blur */}
+      <Image 
+        source={{ uri: currentTrack.thumbnailUrl }} 
+        style={styles.backgroundImage} 
+        blurRadius={50} 
+      />
+      <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
+
+      <SafeAreaView style={styles.safeArea}>
+        {/* Header - Attach panHandlers here so user can drag down from the top */}
+        <View style={styles.header} {...panHandlers}>
             <TouchableOpacity onPress={onClose} style={styles.closeButton}>
               <ChevronDown color="#fff" size={32} />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>Now Playing</Text>
+            {!activeTab && <Text style={styles.headerTitle}>Now Playing</Text>}
             <TouchableOpacity style={styles.moreButton}>
               <MoreVertical color="#fff" size={24} />
             </TouchableOpacity>
           </View>
 
           <View style={styles.mainContent}>
-            {/* Artwork */}
-            <View style={styles.artworkContainer}>
-              <Image
-                source={{ uri: currentTrack.thumbnailUrl }} 
-                style={[styles.artwork, activeTab && styles.artworkSmall]} 
-              />
-            </View>
-
-            {/* Track Info */}
-            <View style={styles.trackDetails}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.title} numberOfLines={1}>{currentTrack.title}</Text>
-                <Text style={styles.artist} numberOfLines={1}>{currentTrack.artist}</Text>
-              </View>
-            </View>
-
-            {/* Progress Bar */}
-            <View style={styles.progressBarPlaceholder}>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
-              </View>
-              <View style={styles.timeRow}>
-                <Text style={styles.timeText}>{formatTime(positionMs)}</Text>
-                <Text style={styles.timeText}>{formatTime(durationMs)}</Text>
-              </View>
-            </View>
-
-            {/* Main Controls */}
-            <View style={styles.controls}>
-              <TouchableOpacity style={styles.secondaryButton}>
-                <Shuffle color="rgba(255,255,255,0.5)" size={24} />
-              </TouchableOpacity>
-
-              <View style={styles.mainControlsCenter}>
-                <TouchableOpacity onPress={playPrevious} style={styles.controlButton}>
-                  <SkipBack color="#fff" size={36} fill="#fff" />
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
-                  {isPlaying ? (
-                    <Pause color="#000" size={36} fill="#000" />
-                  ) : (
-                    <Play color="#000" size={36} fill="#000" style={{ marginLeft: 4 }} />
-                  )}
-                </TouchableOpacity>
-
-                <TouchableOpacity onPress={playNext} style={styles.controlButton}>
-                  <SkipForward color="#fff" size={36} fill="#fff" />
-                </TouchableOpacity>
+            
+            {/* TOP AREA: Artwork + Title/Artist */}
+            <View style={[styles.topArea, activeTab ? styles.topAreaRow : styles.topAreaColumn]}>
+              <View style={activeTab ? styles.artworkSmallContainer : styles.artworkLargeContainer}>
+                <Image
+                  source={{ uri: currentTrack.thumbnailUrl }} 
+                  style={[styles.artwork, activeTab && styles.artworkSmall]} 
+                />
               </View>
 
-              <TouchableOpacity style={styles.secondaryButton}>
-                <Repeat color="rgba(255,255,255,0.5)" size={24} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Tab Switcher below controls */}
-            <View style={styles.bottomTabsContainer}>
-              <View style={styles.tabSwitcher}>
-                <TouchableOpacity 
-                  style={[styles.tabButton, activeTab === 'LYRICS' && styles.activeTabButton]}
-                  onPress={() => setActiveTab(activeTab === 'LYRICS' ? null : 'LYRICS')}
-                >
-                  <Text style={[styles.tabText, activeTab === 'LYRICS' && styles.activeTabText]}>Lyrics</Text>
-                </TouchableOpacity>
-                <TouchableOpacity 
-                  style={[styles.tabButton, activeTab === 'QUEUE' && styles.activeTabButton]}
-                  onPress={() => setActiveTab(activeTab === 'QUEUE' ? null : 'QUEUE')}
-                >
-                  <Text style={[styles.tabText, activeTab === 'QUEUE' && styles.activeTabText]}>Up Next</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Tab Content Area */}
-              {activeTab && (
-                <View style={styles.tabContentArea}>
-                  {activeTab === 'LYRICS' && <LyricsTab />}
-                  {activeTab === 'QUEUE' && <QueueTab />}
+              <View style={activeTab ? styles.trackDetailsSmall : styles.trackDetailsLarge}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.title, activeTab ? styles.titleSmall : styles.titleLarge]} numberOfLines={1}>{currentTrack.title}</Text>
+                  <Text style={[styles.artist, activeTab ? styles.artistSmall : styles.artistLarge]} numberOfLines={1}>{currentTrack.artist}</Text>
                 </View>
-              )}
+              </View>
             </View>
+
+            {/* MIDDLE AREA: Tab Content */}
+            {activeTab && (
+              <View style={styles.tabContentArea}>
+                {activeTab === 'LYRICS' && <LyricsTab onScroll={handleScroll} />}
+                {activeTab === 'QUEUE' && <QueueTab onScroll={handleScroll} />}
+              </View>
+            )}
+
+            {/* BOTTOM AREA: Animated Controls */}
+            <Animated.View style={[styles.bottomArea, { opacity: controlsOpacity }]}>
+              {/* Custom Progress Bar */}
+              <CustomProgressBar positionMs={positionMs} durationMs={durationMs} onSeek={handleSeek} />
+
+              {/* Main Controls */}
+              <View style={styles.controls}>
+                <TouchableOpacity style={styles.secondaryButton}>
+                  <Shuffle color="rgba(255,255,255,0.5)" size={24} />
+                </TouchableOpacity>
+
+                <View style={styles.mainControlsCenter}>
+                  <TouchableOpacity onPress={playPrevious} style={styles.controlButton}>
+                    <SkipBack color="#fff" size={36} fill="#fff" />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
+                    {isPlaying ? (
+                      <Pause color="#000" size={36} fill="#000" />
+                    ) : (
+                      <Play color="#000" size={36} fill="#000" style={{ marginLeft: 4 }} />
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={playNext} style={styles.controlButton}>
+                    <SkipForward color="#fff" size={36} fill="#fff" />
+                  </TouchableOpacity>
+                </View>
+
+                <TouchableOpacity style={styles.secondaryButton}>
+                  <Repeat color="rgba(255,255,255,0.5)" size={24} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Bottom Icon Row */}
+              <View style={styles.bottomIconRow}>
+                <TouchableOpacity onPress={() => handleTabChange(activeTab === 'LYRICS' ? null : 'LYRICS')}>
+                  <MessageSquare size={24} color={activeTab === 'LYRICS' ? '#fff' : 'rgba(255,255,255,0.5)'} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleTabChange(activeTab === 'QUEUE' ? null : 'QUEUE')}>
+                  <ListMusic size={24} color={activeTab === 'QUEUE' ? '#fff' : 'rgba(255,255,255,0.5)'} />
+                </TouchableOpacity>
+              </View>
+            </Animated.View>
 
           </View>
         </SafeAreaView>
       </View>
-    </Modal>
   );
 }
 
@@ -215,60 +291,118 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     justifyContent: 'flex-start',
   },
-  artworkContainer: {
+  topArea: {
     width: '100%',
+  },
+  topAreaColumn: {
+    flexDirection: 'column',
     alignItems: 'center',
     marginTop: 20,
     marginBottom: 32,
-    flexShrink: 1, // allows it to shrink when tabs open
   },
-  artwork: {
+  topAreaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 0,
+    marginBottom: 16,
+  },
+  artworkLargeContainer: {
     width: ARTWORK_SIZE,
     height: ARTWORK_SIZE,
-    borderRadius: 16,
+    marginBottom: 32,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 20 },
     shadowOpacity: 0.6,
     shadowRadius: 30,
+  },
+  artworkSmallContainer: {
+    width: 60,
+    height: 60,
+    marginRight: 16,
+  },
+  artwork: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 16,
     backgroundColor: '#222',
   },
   artworkSmall: {
-    width: ARTWORK_SIZE * 0.5,
-    height: ARTWORK_SIZE * 0.5,
+    borderRadius: 8,
   },
-  trackDetails: {
+  trackDetailsLarge: {
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 24,
+  },
+  trackDetailsSmall: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   title: {
-    fontSize: 24,
-    fontWeight: '800',
     color: '#fff',
     marginBottom: 4,
   },
-  artist: {
+  titleLarge: {
+    fontSize: 24,
+    fontWeight: '800',
+  },
+  titleSmall: {
     fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  artist: {
     color: 'rgba(255,255,255,0.6)',
     fontWeight: '500',
+  },
+  artistLarge: {
+    fontSize: 18,
+  },
+  artistSmall: {
+    fontSize: 14,
+  },
+  tabContentArea: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  bottomArea: {
+    width: '100%',
+    marginTop: 'auto',
   },
   progressBarPlaceholder: {
     width: '100%',
     marginBottom: 24,
   },
+  progressTrackContainer: {
+    width: '100%',
+    height: 30, // hit area
+    justifyContent: 'center',
+    marginBottom: -4,
+  },
   progressTrack: {
     width: '100%',
-    height: 4,
+    height: 6,
     backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: 2,
-    marginBottom: 8,
+    borderRadius: 3,
   },
   progressFill: {
     height: '100%',
     backgroundColor: '#fff',
-    borderRadius: 2,
+    borderRadius: 3,
+  },
+  progressThumb: {
+    position: 'absolute',
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#fff',
+    top: 9, // (30-12)/2
+    marginLeft: -6,
   },
   timeRow: {
     flexDirection: 'row',
@@ -284,7 +418,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    marginBottom: 24,
+    marginBottom: 16,
   },
   mainControlsCenter: {
     flexDirection: 'row',
@@ -306,38 +440,11 @@ const styles = StyleSheet.create({
   secondaryButton: {
     padding: 8,
   },
-  bottomTabsContainer: {
-    flex: 1,
-    width: '100%',
-  },
-  tabSwitcher: {
+  bottomIconRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: 16,
-    marginBottom: 16,
-  },
-  tabButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-  },
-  activeTabButton: {
-    backgroundColor: '#fff',
-  },
-  tabText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  activeTabText: {
-    color: '#000',
-  },
-  tabContentArea: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    borderRadius: 16,
-    overflow: 'hidden',
+    gap: 40,
+    marginTop: 8,
+    paddingBottom: 8,
   }
 });
