@@ -32,7 +32,7 @@ if (typeof global.ReadableStream === 'undefined') {
   global.ReadableStream = ReadableStream as any;
 }
 
-// Fetch placeholders (needed by youtubei.js session init)
+// Native classes needed by some core libraries
 if (typeof global.Request === 'undefined') {
   global.Request = class Request {
     constructor() {}
@@ -51,7 +51,7 @@ if (typeof global.Response === 'undefined') {
   } as any;
 }
 
-// Crypto - youtubei.js needs this for some hashing
+// Crypto - Needed for secure random values and hashing
 if (typeof global.crypto === 'undefined') {
     global.crypto = {
         getRandomValues: (arr: any) => require('react-native-get-random-values').getRandomValues(arr),

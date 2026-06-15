@@ -4,11 +4,11 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Search, Clock, X } from 'lucide-react-native';
 import TopBar from '@/components/ui/TopBar';
-import TrackCard from '@/components/features/TrackCard';
-import TrackListItem from '@/components/features/TrackListItem';
+import { TrackList } from '@/components/features/TrackList';
+import { PlaylistCard } from '@/components/features/PlaylistCard';
+import { ArtistCard } from '@/components/features/ArtistCard';
 import { YouTubeSearchService } from '@/services/YouTubeSearchService';
 import { usePlayerStore } from '@/store/playerStore';
-import { AudioService } from '@/services/AudioService';
 import type { SearchResult, Track } from '@/types/music';
 
 type FilterType = 'song' | 'album' | 'artist' | 'playlist';
@@ -100,28 +100,33 @@ export default function SearchTab() {
     }
   };
 
-  const handlePlayTrack = async (track: SearchResult, index: number) => {
+  const handlePlayTrack = async (track: SearchResult | Track, index: number) => {
     try {
-      if (track.type !== 'song' || !track.videoId) {
-        if (track.type === 'playlist') router.push(`/playlist/${track.id}`);
-        else if (track.type === 'album') router.push(`/album/${track.id}`);
-        else if (track.type === 'artist') router.push(`/artist/${track.id}`);
-        return;
+      const isSearchResult = 'type' in track;
+      if (isSearchResult) {
+        const sr = track as SearchResult;
+        if (sr.type !== 'song' || !sr.videoId) {
+          if (sr.type === 'playlist') router.push(`/playlist/${sr.id}`);
+          else if (sr.type === 'album') router.push(`/album/${sr.id}`);
+          else if (sr.type === 'artist') router.push(`/artist/${sr.id}`);
+          return;
+        }
       }
       
-      setLoadingTrackId(track.videoId);
+      const videoId = isSearchResult ? (track as SearchResult).videoId : (track as Track).videoId;
+      setLoadingTrackId(videoId!);
       
       const mappedTrack: Track = {
-        videoId: track.videoId,
+        videoId: videoId!,
         title: track.title,
-        artist: track.channelTitle || 'Unknown Artist',
+        artist: track.channelTitle || ('artist' in track ? track.artist : 'Unknown Artist') || 'Unknown Artist',
         thumbnailUrl: track.thumbnailUrl,
         durationMs: track.durationMs || 0
       };
 
       setQueue([mappedTrack], 0);
       setCurrentTrack(mappedTrack);
-      await AudioService.playTrack(mappedTrack.videoId);
+
     } catch (error) {
       console.error("Playback failed:", error);
       alert("Failed to extract or play this track.");
@@ -129,6 +134,14 @@ export default function SearchTab() {
       setLoadingTrackId(null);
     }
   };
+
+  const mappedTracksForList: Track[] = searchResults.map(r => ({
+    videoId: r.videoId || '',
+    title: r.title,
+    artist: r.channelTitle || 'Unknown Artist',
+    thumbnailUrl: r.thumbnailUrl,
+    durationMs: r.durationMs || 0
+  }));
 
   return (
     <View style={styles.container}>
@@ -185,7 +198,7 @@ export default function SearchTab() {
         ) : (
           // Active Search State
           <>
-            <Text style={styles.resultsTitle}>Search Results for "{searchQuery}"</Text>
+            <Text style={styles.resultsTitle}>Search Results for &quot;{searchQuery}&quot;</Text>
             
             {/* Filter Tabs */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersWrapper} contentContainerStyle={styles.filtersContainer}>
@@ -210,39 +223,32 @@ export default function SearchTab() {
               activeFilter === 'song' ? (
                 // List Layout for Tracks
                 <View style={styles.trackListContainer}>
-                  {searchResults.map((result, i) => (
-                    <TrackListItem
-                      key={result.videoId || result.id || i}
-                      track={{
-                        videoId: result.videoId || '',
-                        title: result.title,
-                        artist: result.channelTitle || 'Unknown Artist',
-                        thumbnailUrl: result.thumbnailUrl,
-                        durationMs: result.durationMs || 0
-                      }}
-                      index={i}
-                      isLoading={loadingTrackId === result.videoId}
-                      onPress={() => handlePlayTrack(result, i)}
-                    />
-                  ))}
+                  <TrackList 
+                    tracks={mappedTracksForList} 
+                    onTrackSelect={handlePlayTrack} 
+                  />
                 </View>
               ) : (
                 // Grid Layout for Albums, Artists, Playlists
                 <View style={styles.resultsGrid}>
                   {searchResults.map((result, i) => (
                     <View key={result.videoId || result.id || i} style={styles.resultItem}>
-                      <TrackCard 
-                        track={{
-                          videoId: result.videoId || '',
-                          title: result.title,
-                          artist: result.channelTitle || 'Unknown Artist',
-                          thumbnailUrl: result.thumbnailUrl,
-                          durationMs: result.durationMs || 0
-                        }}
-                        isArtist={activeFilter === 'artist'}
-                        isLoading={loadingTrackId === result.videoId}
-                        onPress={() => handlePlayTrack(result, i)}
-                      />
+                      {activeFilter === 'artist' ? (
+                        <ArtistCard
+                          id={result.id}
+                          name={result.channelTitle || result.title || "Artist"}
+                          thumbnailUrl={result.thumbnailUrl}
+                          onPress={() => result.id && router.push(`/artist/${result.id}`)}
+                        />
+                      ) : (
+                        <PlaylistCard
+                          id={result.id}
+                          title={result.title}
+                          subtitle={result.channelTitle}
+                          thumbnailUrl={result.thumbnailUrl}
+                          onPress={() => handlePlayTrack(result, i)}
+                        />
+                      )}
                     </View>
                   ))}
                 </View>
@@ -354,7 +360,7 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   trackListContainer: {
-    paddingHorizontal: 0,
+    paddingHorizontal: 8,
   },
   resultsGrid: {
     paddingHorizontal: 16,

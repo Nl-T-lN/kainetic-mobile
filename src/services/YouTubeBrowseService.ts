@@ -11,8 +11,8 @@ const WEB_CLIENT_PAYLOAD = {
 };
 
 // Deep search helper
-function findKeys(obj: any, key: string, results: any[] = []) {
-  if (typeof obj !== 'object' || obj === null) return;
+function findKeys(obj: any, key: string, results: any[] = []): any[] {
+  if (typeof obj !== 'object' || obj === null) return results;
   if (obj.hasOwnProperty(key)) {
     results.push(obj[key]);
   }

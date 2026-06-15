@@ -15,6 +15,18 @@ export class AudioService {
         allowsRecording: false,
       });
       console.log('[AudioService] Audio mode configured successfully');
+
+      // Subscribe to Zustand store changes purely outside of React
+      usePlayerStore.subscribe((state, prevState) => {
+        if (state.currentTrack?.videoId !== prevState.currentTrack?.videoId) {
+          if (state.currentTrack) {
+            this.playTrack(state.currentTrack.videoId);
+          } else {
+            this.pause();
+          }
+        }
+      });
+
     } catch (e) {
       console.error('[AudioService] Failed to set audio mode:', e);
     }

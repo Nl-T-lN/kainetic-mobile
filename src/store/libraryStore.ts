@@ -21,7 +21,6 @@ interface LibraryState {
   setSavedTracks: (tracks: Track[]) => void;
   toggleSaveTrack: (track: Track) => void;
   addRecentTrack: (track: Track) => void;
-  addRecentTrack: (track: Track) => void;
   createPlaylist: (name: string, initialTracks?: Track[]) => string;
   deletePlaylist: (id: string) => void;
   addTrackToPlaylist: (playlistId: string, track: Track) => void;

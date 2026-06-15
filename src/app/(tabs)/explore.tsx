@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { useRouter } from 'expo-router';
 import TopBar from '@/components/ui/TopBar';
-import TrackCard from '@/components/features/TrackCard';
 import type { Track } from '@/types/music';
 
 const MOODS = [

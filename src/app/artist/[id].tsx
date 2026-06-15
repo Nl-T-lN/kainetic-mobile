@@ -3,16 +3,17 @@ import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIn
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Play } from 'lucide-react-native';
 import { usePlayerStore } from '@/store/playerStore';
-import { AudioService } from '@/services/AudioService';
 import { YouTubeBrowseService, ArtistResult } from '@/services/YouTubeBrowseService';
-import TrackListItem from '@/components/features/TrackListItem';
+import { TrackList } from '@/components/features/TrackList';
+import { PlaylistCard } from '@/components/features/PlaylistCard';
+import { BlurView } from 'expo-blur';
+import type { Track } from '@/types/music';
 
 export default function ArtistView() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [data, setData] = useState<ArtistResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
 
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const setQueue = usePlayerStore((state) => state.setQueue);
@@ -32,18 +33,13 @@ export default function ArtistView() {
     fetchData();
   }, [id]);
 
-  const handlePlayTrack = async (track: any, index: number) => {
+  const handlePlayTrack = async (track: Track, index: number) => {
     try {
       if (!data) return;
-      setLoadingTrackId(track.videoId);
       setQueue(data.topTracks, index);
       setCurrentTrack(track);
-      await AudioService.playTrack(track.videoId);
     } catch (error) {
       console.error("Playback failed:", error);
-      alert("Failed to play this track.");
-    } finally {
-      setLoadingTrackId(null);
     }
   };
 
@@ -56,7 +52,7 @@ export default function ArtistView() {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#fff" />
+        <ActivityIndicator size="large" color="#34d399" />
       </View>
     );
   }
@@ -73,68 +69,76 @@ export default function ArtistView() {
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
       <TouchableOpacity style={styles.headerBack} onPress={() => router.back()}>
         <ChevronLeft size={28} color="#fff" />
       </TouchableOpacity>
       
-      <View style={styles.heroSection}>
-        <Image source={{ uri: data.thumbnailUrl }} style={styles.heroImage} />
-        <Text style={styles.title} numberOfLines={2}>{data.name}</Text>
-        <Text style={styles.author}>{data.subscribers}</Text>
-        
-        <TouchableOpacity style={styles.playButton} onPress={handlePlayAll}>
-          <Play size={24} color="#000" fill="#000" />
-          <Text style={styles.playButtonText}>Play</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.heroSection}>
+          <Image source={{ uri: data.thumbnailUrl }} style={[StyleSheet.absoluteFill, { opacity: 0.8 }]} blurRadius={50} />
+          <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
 
-      <View style={styles.sectionContainer}>
-        <Text style={styles.sectionHeader}>Top Tracks</Text>
-        <View style={styles.trackList}>
-          {data.topTracks.map((track, index) => (
-            <TrackListItem
-              key={track.videoId + '-' + index}
-              track={track}
-              isLoading={loadingTrackId === track.videoId}
-              onPress={() => handlePlayTrack(track, index)}
-            />
-          ))}
+          <View style={styles.heroContent}>
+            <Image source={{ uri: data.thumbnailUrl }} style={styles.heroImage} />
+            <Text style={styles.title} numberOfLines={2}>{data.name}</Text>
+            <Text style={styles.author}>{data.subscribers}</Text>
+            
+            <TouchableOpacity style={styles.playButton} onPress={handlePlayAll}>
+              <Play size={24} color="#000" fill="#000" />
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
 
-      {/* Basic Album/Singles Layout placeholders. You could add horizontal scroll views similar to Home */}
-      {data.albums.length > 0 && (
-          <View style={styles.sectionContainer}>
-              <Text style={styles.sectionHeader}>Albums</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-                  {data.albums.map((album, idx) => (
-                      <TouchableOpacity key={idx} style={styles.albumCard} onPress={() => router.push(`/album/${album.id}`)}>
-                          <Image source={{ uri: album.thumbnailUrl }} style={styles.albumImage} />
-                          <Text style={styles.albumTitle} numberOfLines={1}>{album.title}</Text>
-                          <Text style={styles.albumYear}>{album.year}</Text>
-                      </TouchableOpacity>
-                  ))}
-              </ScrollView>
+        <View style={styles.sectionContainer}>
+          <Text style={styles.sectionHeader}>Top Tracks</Text>
+          <View style={styles.trackList}>
+            <TrackList 
+              tracks={data.topTracks}
+              onTrackSelect={handlePlayTrack}
+              hideThumbnails={false}
+            />
           </View>
-      )}
+        </View>
 
-      {data.singles.length > 0 && (
-          <View style={styles.sectionContainer}>
-              <Text style={styles.sectionHeader}>Singles</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-                  {data.singles.map((single, idx) => (
-                      <TouchableOpacity key={idx} style={styles.albumCard} onPress={() => router.push(`/album/${single.id}`)}>
-                          <Image source={{ uri: single.thumbnailUrl }} style={styles.albumImage} />
-                          <Text style={styles.albumTitle} numberOfLines={1}>{single.title}</Text>
-                          <Text style={styles.albumYear}>{single.year}</Text>
-                      </TouchableOpacity>
-                  ))}
-              </ScrollView>
-          </View>
-      )}
+        {data.albums.length > 0 && (
+            <View style={styles.sectionContainer}>
+                <Text style={styles.sectionHeader}>Albums</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+                    {data.albums.map((album, idx) => (
+                        <PlaylistCard
+                          key={idx}
+                          id={album.id}
+                          title={album.title}
+                          subtitle={album.year}
+                          thumbnailUrl={album.thumbnailUrl}
+                          onPress={() => router.push(`/album/${album.id}`)}
+                        />
+                    ))}
+                </ScrollView>
+            </View>
+        )}
 
-    </ScrollView>
+        {data.singles.length > 0 && (
+            <View style={styles.sectionContainer}>
+                <Text style={styles.sectionHeader}>Singles</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+                    {data.singles.map((single, idx) => (
+                        <PlaylistCard
+                          key={idx}
+                          id={single.id}
+                          title={single.title}
+                          subtitle={single.year}
+                          thumbnailUrl={single.thumbnailUrl}
+                          onPress={() => router.push(`/album/${single.id}`)}
+                        />
+                    ))}
+                </ScrollView>
+            </View>
+        )}
+
+      </ScrollView>
+    </View>
   );
 }
 
@@ -160,8 +164,8 @@ const styles = StyleSheet.create({
   backButton: {
       paddingHorizontal: 20,
       paddingVertical: 10,
-      backgroundColor: '#333',
-      borderRadius: 8,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      borderRadius: 20,
   },
   backText: {
       color: '#fff',
@@ -180,11 +184,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroSection: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroContent: {
     alignItems: 'center',
-    paddingTop: 80,
+    paddingTop: 100,
     paddingHorizontal: 20,
     paddingBottom: 32,
-    backgroundColor: 'transparent',
+    zIndex: 1,
   },
   heroImage: {
     width: 160,
@@ -192,70 +200,52 @@ const styles = StyleSheet.create({
     borderRadius: 80,
     marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
   },
   title: {
     color: '#fff',
-    fontSize: 28,
-    fontWeight: 'bold',
+    fontSize: 32,
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: 8,
+    letterSpacing: -1,
   },
   author: {
-    color: '#aaa',
-    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 15,
+    fontWeight: '500',
     marginBottom: 24,
   },
   playButton: {
-    flexDirection: 'row',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#1db954',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 24,
-  },
-  playButtonText: {
-    color: '#000',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   sectionContainer: {
-    marginTop: 24,
+    marginTop: 32,
   },
   sectionHeader: {
     color: '#fff',
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '800',
     marginLeft: 16,
     marginBottom: 16,
+    letterSpacing: -0.5,
   },
   trackList: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
   },
   horizontalScroll: {
     paddingHorizontal: 16,
     gap: 16,
   },
-  albumCard: {
-    width: 140,
-  },
-  albumImage: {
-    width: 140,
-    height: 140,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  albumTitle: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  albumYear: {
-    color: '#aaa',
-    fontSize: 12,
-  }
 });

@@ -2,19 +2,18 @@ import React from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import TopBar from '@/components/ui/TopBar';
 import { useLibraryStore } from '@/store/libraryStore';
-import TrackListItem from '@/components/features/TrackListItem';
+import { TrackList } from '@/components/features/TrackList';
 import { usePlayerStore } from '@/store/playerStore';
-import { AudioService } from '@/services/AudioService';
+import type { Track } from '@/types/music';
 
 export default function RecentTab() {
   const recentTracks = useLibraryStore(state => state.recentTracks);
   const setCurrentTrack = usePlayerStore(state => state.setCurrentTrack);
   const setQueue = usePlayerStore(state => state.setQueue);
 
-  const handlePlay = async (track: any, index: number) => {
+  const handlePlay = async (track: Track, index: number) => {
     setQueue(recentTracks, index);
     setCurrentTrack(track);
-    await AudioService.playTrack(track.videoId);
   };
 
   return (
@@ -29,14 +28,10 @@ export default function RecentTab() {
           </View>
         ) : (
           <View style={styles.list}>
-            {recentTracks.map((track, index) => (
-              <TrackListItem 
-                key={track.videoId + '-' + index} 
-                track={track}
-                index={index}
-                onPress={() => handlePlay(track, index)}
-              />
-            ))}
+            <TrackList 
+              tracks={recentTracks}
+              onTrackSelect={handlePlay}
+            />
           </View>
         )}
       </ScrollView>
@@ -56,13 +51,14 @@ const styles = StyleSheet.create({
   sectionHeader: {
     color: '#fff',
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: '800',
     marginLeft: 16,
     marginBottom: 16,
     letterSpacing: -0.5,
   },
   list: {
     paddingBottom: 20,
+    paddingHorizontal: 8,
   },
   emptyState: {
     padding: 32,

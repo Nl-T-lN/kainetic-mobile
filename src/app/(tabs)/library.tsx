@@ -20,7 +20,7 @@ export default function LibraryTab() {
 
         {playlists.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>You haven't created any playlists yet.</Text>
+            <Text style={styles.emptyText}>You haven&apos;t created any playlists yet.</Text>
           </View>
         ) : (
           <View style={styles.grid}>

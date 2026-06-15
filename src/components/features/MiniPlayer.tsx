@@ -5,6 +5,7 @@ import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { BlurView } from 'expo-blur';
 import ExpandedPlayer from './ExpandedPlayer';
+import { AudioService } from '@/services/AudioService';
 
 export default function MiniPlayer() {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -51,7 +52,17 @@ export default function MiniPlayer() {
 
             <TouchableOpacity 
               style={styles.iconButton}
-              onPress={() => setIsPlaying(!isPlaying)}
+              onPress={async () => {
+                try {
+                  if (isPlaying) {
+                    await AudioService.pause();
+                  } else {
+                    await AudioService.resume();
+                  }
+                } catch (e) {
+                  console.error(e);
+                }
+              }}
             >
               {isPlaying ? (
                 <Pause size={24} color="#fff" fill="#fff" />

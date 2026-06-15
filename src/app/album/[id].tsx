@@ -3,16 +3,16 @@ import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIn
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronLeft, Play } from 'lucide-react-native';
 import { usePlayerStore } from '@/store/playerStore';
-import { AudioService } from '@/services/AudioService';
 import { YouTubeBrowseService, BrowseResult } from '@/services/YouTubeBrowseService';
-import TrackListItem from '@/components/features/TrackListItem';
+import { TrackList } from '@/components/features/TrackList';
+import { BlurView } from 'expo-blur';
+import type { Track } from '@/types/music';
 
-export default function PlaylistView() {
+export default function AlbumView() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [data, setData] = useState<BrowseResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
 
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const setQueue = usePlayerStore((state) => state.setQueue);
@@ -32,18 +32,13 @@ export default function PlaylistView() {
     fetchData();
   }, [id]);
 
-  const handlePlayTrack = async (track: any, index: number) => {
+  const handlePlayTrack = async (track: Track, index: number) => {
     try {
       if (!data) return;
-      setLoadingTrackId(track.videoId);
       setQueue(data.tracks, index);
       setCurrentTrack(track);
-      await AudioService.playTrack(track.videoId);
     } catch (error) {
       console.error("Playback failed:", error);
-      alert("Failed to play this track.");
-    } finally {
-      setLoadingTrackId(null);
     }
   };
 
@@ -56,7 +51,7 @@ export default function PlaylistView() {
   if (loading) {
     return (
       <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#fff" />
+        <ActivityIndicator size="large" color="#34d399" />
       </View>
     );
   }
@@ -72,34 +67,41 @@ export default function PlaylistView() {
     );
   }
 
+  const totalDurationMs = data.tracks.reduce((acc, curr) => acc + (curr.durationMs || 0), 0);
+  const durationMins = Math.floor(totalDurationMs / 60000);
+
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <View style={styles.container}>
       <TouchableOpacity style={styles.headerBack} onPress={() => router.back()}>
         <ChevronLeft size={28} color="#fff" />
       </TouchableOpacity>
       
-      <View style={styles.heroSection}>
-        <Image source={{ uri: data.thumbnailUrl }} style={styles.heroImage} />
-        <Text style={styles.title} numberOfLines={2}>{data.title}</Text>
-        <Text style={styles.author}>{data.author}</Text>
-        
-        <TouchableOpacity style={styles.playButton} onPress={handlePlayAll}>
-          <Play size={24} color="#000" fill="#000" />
-          <Text style={styles.playButtonText}>Play</Text>
-        </TouchableOpacity>
-      </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.heroSection}>
+          <Image source={{ uri: data.thumbnailUrl }} style={[StyleSheet.absoluteFill, { opacity: 0.8 }]} blurRadius={50} />
+          <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+          
+          <View style={styles.heroContent}>
+            <Image source={{ uri: data.thumbnailUrl }} style={styles.heroImage} />
+            <Text style={styles.title} numberOfLines={2}>{data.title}</Text>
+            <Text style={styles.author}>Album • {data.author}</Text>
+            <Text style={styles.stats}>{data.tracks.length} songs • {durationMins} minutes</Text>
+            
+            <TouchableOpacity style={styles.playButton} onPress={handlePlayAll}>
+              <Play size={24} color="#000" fill="#000" />
+            </TouchableOpacity>
+          </View>
+        </View>
 
-      <View style={styles.trackList}>
-        {data.tracks.map((track, index) => (
-          <TrackListItem
-            key={track.videoId + '-' + index}
-            track={track}
-            isLoading={loadingTrackId === track.videoId}
-            onPress={() => handlePlayTrack(track, index)}
+        <View style={styles.trackList}>
+          <TrackList 
+            tracks={data.tracks}
+            onTrackSelect={handlePlayTrack}
+            hideThumbnails={false}
           />
-        ))}
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -125,8 +127,8 @@ const styles = StyleSheet.create({
   backButton: {
       paddingHorizontal: 20,
       paddingVertical: 10,
-      backgroundColor: '#333',
-      borderRadius: 8,
+      backgroundColor: 'rgba(255,255,255,0.1)',
+      borderRadius: 20,
   },
   backText: {
       color: '#fff',
@@ -145,49 +147,59 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   heroSection: {
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  heroContent: {
     alignItems: 'center',
     paddingTop: 100,
     paddingHorizontal: 20,
     paddingBottom: 32,
-    backgroundColor: 'transparent',
+    zIndex: 1,
   },
   heroImage: {
-    width: 200,
-    height: 200,
+    width: 240, // Match max-width 900px from web AlbumView (240px)
+    height: 240,
     borderRadius: 8,
     marginBottom: 24,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
   },
   title: {
     color: '#fff',
     fontSize: 28,
-    fontWeight: 'bold',
+    fontWeight: '800',
     textAlign: 'center',
     marginBottom: 8,
+    letterSpacing: -0.5,
   },
   author: {
-    color: '#aaa',
-    fontSize: 16,
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 15,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  stats: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 13,
     marginBottom: 24,
   },
   playButton: {
-    flexDirection: 'row',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#fff', // Match PlayFab cream color from web
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#1db954',
-    paddingHorizontal: 32,
-    paddingVertical: 12,
-    borderRadius: 24,
-  },
-  playButtonText: {
-    color: '#000',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
   },
   trackList: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 8,
+    paddingTop: 16,
   },
 });

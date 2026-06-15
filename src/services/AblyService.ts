@@ -28,7 +28,7 @@ class AblySyncService {
                     setCurrentTrack(state.track);
                 }
                 if (state.queue) {
-                    setQueue(state.queue, state.currentIndex || 0);
+                    setQueue(state.queue, state.queueIndex || 0);
                 }
                 if (state.isPlaying !== undefined) {
                     setIsPlaying(state.isPlaying);
@@ -44,7 +44,7 @@ class AblySyncService {
         this.channel.publish('sync', {
             track: state.currentTrack,
             queue: state.queue,
-            currentIndex: state.currentIndex,
+            queueIndex: state.queueIndex,
             isPlaying: state.isPlaying
         });
     }
