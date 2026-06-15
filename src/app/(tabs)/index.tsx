@@ -14,6 +14,7 @@ import { RefreshCw } from 'lucide-react-native';
 
 export default function HomeTab() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const setQueue = usePlayerStore((state) => state.setQueue);
   const addRecentTrack = useLibraryStore((state) => state.addRecentTrack);
@@ -25,17 +26,8 @@ export default function HomeTab() {
   useEffect(() => {
     async function loadHome() {
       try {
-        const [homeSections, searchResults] = await Promise.all([
-          YouTubeHomeService.fetchHome(),
-          YouTubeSearchService.search('Top Pop Hits 2024', 'song')
-        ]);
-        
-        const recommendationsSection: HomeSection = {
-          title: 'Recommendations',
-          items: searchResults
-        };
-
-        setSections([recommendationsSection, ...homeSections]);
+        const homeSections = await YouTubeHomeService.fetchHome();
+        setSections(homeSections);
       } catch (err) {
         console.error('Failed to load home', err);
       } finally {
@@ -88,16 +80,23 @@ export default function HomeTab() {
     }
   };
 
-  const renderSectionHeader = (title: string, showRefresh: boolean = false) => (
-    <View style={styles.sectionHeaderRow}>
-      <Text style={styles.sectionHeader}>{title}</Text>
-      {showRefresh && (
-        <TouchableOpacity style={styles.iconButton}>
-          <RefreshCw size={16} color="rgba(255,255,255,0.6)" />
-        </TouchableOpacity>
-      )}
-    </View>
-  );
+  const renderSectionHeader = (title: string, showRefresh: boolean = false) => {
+    const isQuickPicks = title.toLowerCase().includes('quick picks') || title.toLowerCase().includes('recommendation');
+    return (
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionHeader}>{title}</Text>
+        {isQuickPicks ? (
+          <TouchableOpacity style={styles.playAllButton}>
+            <Text style={styles.playAllText}>Play all</Text>
+          </TouchableOpacity>
+        ) : showRefresh ? (
+          <TouchableOpacity style={styles.iconButton}>
+            <RefreshCw size={16} color="rgba(255,255,255,0.6)" />
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    );
+  };
 
   const renderSection = (section: HomeSection, index: number) => {
     const isSongSection = section.items[0]?.type === 'song';
@@ -111,6 +110,8 @@ export default function HomeTab() {
         chunks.push(section.items.slice(i, i + chunkSize));
       }
 
+      const columnWidth = width * 0.88;
+
       return (
         <View key={index} style={styles.sectionContainer}>
           {renderSectionHeader(section.title, true)}
@@ -118,14 +119,16 @@ export default function HomeTab() {
             horizontal 
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalScroll}
-            snapToInterval={296} // approx card width + gap
+            snapToInterval={columnWidth + 16} // card width + margin right
             decelerationRate="fast"
+            snapToAlignment="start"
           >
             {chunks.map((chunk, chunkIdx) => (
               <View key={`chunk-${chunkIdx}`} style={{ flexDirection: 'column' }}>
                 {chunk.map((item, i) => (
                   <RecommendedTrackCard
                     key={item.videoId || item.id || i}
+                    width={columnWidth}
                     track={{
                         videoId: item.videoId || item.id || '',
                         title: item.title,
@@ -263,6 +266,18 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.1)',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  playAllButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.2)',
+  },
+  playAllText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
   },
   horizontalScroll: {
     paddingLeft: 16,

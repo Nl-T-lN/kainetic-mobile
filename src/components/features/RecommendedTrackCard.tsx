@@ -6,11 +6,12 @@ import type { Track } from '@/types/music';
 interface RecommendedTrackCardProps {
   track: Track;
   onPress: () => void;
+  width?: number;
 }
 
-export function RecommendedTrackCard({ track, onPress }: RecommendedTrackCardProps) {
+export function RecommendedTrackCard({ track, onPress, width = 320 }: RecommendedTrackCardProps) {
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+    <TouchableOpacity style={[styles.card, { width }]} onPress={onPress} activeOpacity={0.8}>
       <Image 
         source={{ uri: track.thumbnailUrl }} 
         style={styles.image} 
@@ -32,17 +33,12 @@ export function RecommendedTrackCard({ track, onPress }: RecommendedTrackCardPro
 
 const styles = StyleSheet.create({
   card: {
-    width: '85%', // 85vw from web styles
-    minWidth: 280,
+    width: 320, // fixed width so chunks align well in horizontal scroll
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)',
-    borderColor: 'rgba(255, 255, 255, 0.06)',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 8,
+    backgroundColor: 'transparent',
+    paddingVertical: 8,
     marginRight: 16,
-    marginBottom: 8,
   },
   image: {
     width: 56,
