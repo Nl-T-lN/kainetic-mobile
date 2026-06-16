@@ -1,4 +1,5 @@
 import { SearchResult, Track } from '@/types/music';
+import { APIConfig, findKeys } from '@/config/APIConfig';
 
 export function getHighResThumbnail(thumbnails: any): string {
   if (!thumbnails) return "";
@@ -38,28 +39,6 @@ export function getHighResThumbnail(thumbnails: any): string {
   return url;
 }
 
-const SEARCH_API = 'https://music.youtube.com/youtubei/v1/search';
-
-const WEB_CLIENT_PAYLOAD = {
-  clientName: 'WEB_REMIX',
-  clientVersion: '1.20231214.00.00',
-  hl: 'en',
-  gl: 'US',
-};
-
-function findKeys(obj: any, key: string, results: any[] = []) {
-  if (typeof obj !== 'object' || obj === null) return;
-  if (obj.hasOwnProperty(key)) {
-    results.push(obj[key]);
-  }
-  for (const k in obj) {
-    if (obj.hasOwnProperty(k)) {
-      findKeys(obj[k], key, results);
-    }
-  }
-  return results;
-}
-
 export class YouTubeSearchService {
   static async search(query: string, type: 'song' | 'artist' | 'album' | 'playlist' | 'all' = 'song'): Promise<SearchResult[]> {
     try {
@@ -69,18 +48,18 @@ export class YouTubeSearchService {
       if (type === 'artist') params = 'Eg-KAQwIARAW';
       if (type === 'playlist') params = 'Eg-KAQwIARAw';
 
-      const response = await fetch(SEARCH_API, {
+      const response = await fetch(APIConfig.YOUTUBE.SEARCH_API, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
-          'X-YouTube-Client-Name': '67',
-          'X-YouTube-Client-Version': WEB_CLIENT_PAYLOAD.clientVersion,
+          'X-YouTube-Client-Name': APIConfig.YOUTUBE.WEB_CLIENT_PAYLOAD.clientName === 'WEB_REMIX' ? '67' : '1',
+          'X-YouTube-Client-Version': APIConfig.YOUTUBE.WEB_CLIENT_PAYLOAD.clientVersion,
           'Origin': 'https://music.youtube.com',
           'Referer': 'https://music.youtube.com/',
         },
         body: JSON.stringify({
-          context: { client: WEB_CLIENT_PAYLOAD },
+          context: { client: APIConfig.YOUTUBE.WEB_CLIENT_PAYLOAD },
           query: query,
           params: params ? params : undefined,
         }),
@@ -158,7 +137,7 @@ export class YouTubeSearchService {
 
   static async getUpNext(videoId: string): Promise<Track[]> {
     try {
-      const response = await fetch('https://music.youtube.com/youtubei/v1/next', {
+      const response = await fetch(APIConfig.YOUTUBE.NEXT_API, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -166,7 +145,7 @@ export class YouTubeSearchService {
           'Origin': 'https://music.youtube.com',
         },
         body: JSON.stringify({
-          context: { client: WEB_CLIENT_PAYLOAD },
+          context: { client: APIConfig.YOUTUBE.WEB_CLIENT_PAYLOAD },
           videoId: videoId,
           playlistId: "RDAMVM" + videoId
         }),
@@ -184,7 +163,7 @@ export class YouTubeSearchService {
         const titleRuns = renderer.title?.runs || [];
         const title = titleRuns.map((r: any) => r.text).join('') || 'Unknown Title';
         
-        const subtitleRuns = renderer.longBylineText?.runs || [];
+        const subtitleRuns = renderer.longBylineText?.runs || renderer.shortBylineText?.runs || [];
         let artist = 'Unknown Artist';
         if (subtitleRuns.length > 0) {
            artist = subtitleRuns.map((r: any) => r.text).join('');

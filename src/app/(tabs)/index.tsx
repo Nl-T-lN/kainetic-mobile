@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, ActivityIndicator, useWindowDimensions, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect, useCallback, memo } from 'react';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, useWindowDimensions, TouchableOpacity, ScrollView } from 'react-native';
 import { useRouter } from 'expo-router';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
@@ -13,6 +13,27 @@ import { ArtistCard } from '@/components/features/ArtistCard';
 import { RecommendedTrackCard } from '@/components/features/RecommendedTrackCard';
 import { RefreshCw } from 'lucide-react-native';
 
+// Global cache to prevent rate-limiting on hot reloads
+let cachedHomeSections: HomeSection[] | null = null;
+
+const SectionHeader = memo(({ title, showRefresh }: { title: string, showRefresh: boolean }) => {
+  const isQuickPicks = title.toLowerCase().includes('quick picks') || title.toLowerCase().includes('recommendation');
+  return (
+    <View style={styles.sectionHeaderRow}>
+      <Text style={styles.sectionHeader}>{title}</Text>
+      {isQuickPicks ? (
+        <TouchableOpacity style={styles.playAllButton}>
+          <Text style={styles.playAllText}>Play all</Text>
+        </TouchableOpacity>
+      ) : showRefresh ? (
+        <TouchableOpacity style={styles.iconButton}>
+          <RefreshCw size={16} color="rgba(255,255,255,0.6)" />
+        </TouchableOpacity>
+      ) : null}
+    </View>
+  );
+});
+
 export default function HomeTab() {
   const router = useRouter();
   const { width } = useWindowDimensions();
@@ -23,45 +44,54 @@ export default function HomeTab() {
   const [sections, setSections] = useState<HomeSection[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadHome() {
-      try {
-        const stateRecentTracks = useLibraryStore.getState().recentTracks || [];
-        const quickPicksSeed = (stateRecentTracks.length > 0 && stateRecentTracks[0].videoId) ? stateRecentTracks[0].videoId : 'fHI8X4OXluQ';
-
-        const [homeSections, quickPicksTracks] = await Promise.all([
-          YouTubeHomeService.fetchHome(),
-          YouTubeSearchService.getUpNext(quickPicksSeed)
-        ]);
-
-        const filteredSections = homeSections.filter(s => 
-          !s.title.toLowerCase().includes('quick picks') && 
-          !s.title.toLowerCase().includes('recommend')
-        );
-
-        const newSections: HomeSection[] = [];
-        if (quickPicksTracks && quickPicksTracks.length > 0) {
-          newSections.push({
-            title: "Quick Picks",
-            items: quickPicksTracks.slice(0, 20).map(t => ({
-              ...t,
-              id: t.videoId,
-              type: 'song'
-            })) as any
-          });
-        }
-
-        setSections([...newSections, ...filteredSections]);
-      } catch (err) {
-        console.error('Failed to load home', err);
-      } finally {
-        setLoading(false);
-      }
+  const loadHome = useCallback(async (force = false) => {
+    if (!force && cachedHomeSections) {
+      setSections(cachedHomeSections);
+      setLoading(false);
+      return;
     }
-    loadHome();
+
+    try {
+      const stateRecentTracks = useLibraryStore.getState().recentTracks || [];
+      const quickPicksSeed = (stateRecentTracks.length > 0 && stateRecentTracks[0].videoId) ? stateRecentTracks[0].videoId : 'fHI8X4OXluQ';
+
+      const [homeSections, quickPicksTracks] = await Promise.all([
+        YouTubeHomeService.fetchHome(),
+        YouTubeSearchService.getUpNext(quickPicksSeed)
+      ]);
+
+      const filteredSections = homeSections.filter(s => 
+        !s.title.toLowerCase().includes('quick picks') && 
+        !s.title.toLowerCase().includes('recommend')
+      );
+
+      const newSections: HomeSection[] = [];
+      if (quickPicksTracks && quickPicksTracks.length > 0) {
+        newSections.push({
+          title: "Quick Picks",
+          items: quickPicksTracks.slice(0, 20).map(t => ({
+            ...t,
+            id: t.videoId,
+            type: 'song'
+          })) as any
+        });
+      }
+
+      const finalSections = [...newSections, ...filteredSections];
+      cachedHomeSections = finalSections;
+      setSections(finalSections);
+    } catch (err) {
+      console.error('Failed to load home', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const handlePlayTrack = async (item: SearchResult | Track, list: (SearchResult | Track)[]) => {
+  useEffect(() => {
+    loadHome();
+  }, [loadHome]);
+
+  const handlePlayTrack = useCallback(async (item: SearchResult | Track, list: (SearchResult | Track)[]) => {
     try {
       const isSearchResult = 'type' in item;
       const videoId = isSearchResult ? (item as SearchResult).videoId : (item as Track).videoId;
@@ -98,32 +128,13 @@ export default function HomeTab() {
     } catch (error) {
       console.error("Playback failed:", error);
     }
-  };
+  }, [router, setCurrentTrack, setQueue]);
 
-  const renderSectionHeader = (title: string, showRefresh: boolean = false) => {
-    const isQuickPicks = title.toLowerCase().includes('quick picks') || title.toLowerCase().includes('recommendation');
-    return (
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionHeader}>{title}</Text>
-        {isQuickPicks ? (
-          <TouchableOpacity style={styles.playAllButton}>
-            <Text style={styles.playAllText}>Play all</Text>
-          </TouchableOpacity>
-        ) : showRefresh ? (
-          <TouchableOpacity style={styles.iconButton}>
-            <RefreshCw size={16} color="rgba(255,255,255,0.6)" />
-          </TouchableOpacity>
-        ) : null}
-      </View>
-    );
-  };
-
-  const renderSection = (section: HomeSection, index: number) => {
+  const renderSection = ({ item: section, index }: { item: HomeSection, index: number }) => {
     const isSongSection = section.items[0]?.type === 'song';
     const isArtistSection = section.items[0]?.type === 'artist' || section.title.toLowerCase().includes('artist');
 
     if (isSongSection) {
-      // Chunk items into columns of 4 for RecommendedTracks
       const chunkSize = 4;
       const chunks = [];
       for (let i = 0; i < section.items.length; i += chunkSize) {
@@ -133,13 +144,13 @@ export default function HomeTab() {
       const columnWidth = width * 0.88;
 
       return (
-        <View key={index} style={styles.sectionContainer}>
-          {renderSectionHeader(section.title, true)}
+        <View style={styles.sectionContainer}>
+          <SectionHeader title={section.title} showRefresh={true} />
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalScroll}
-            snapToInterval={columnWidth + 16} // card width + margin right
+            snapToInterval={columnWidth + 16}
             decelerationRate="fast"
             snapToAlignment="start"
           >
@@ -168,86 +179,98 @@ export default function HomeTab() {
 
     if (isArtistSection) {
       return (
-        <View key={index} style={styles.sectionContainer}>
-          {renderSectionHeader(section.title, true)}
-          <ScrollView 
-            horizontal 
+        <View style={styles.sectionContainer}>
+          <SectionHeader title={section.title} showRefresh={true} />
+          <FlatList
+            horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.horizontalScroll}
-          >
-            {section.items.map((item, i) => (
+            data={section.items}
+            keyExtractor={(item, i) => item.id || `${i}`}
+            renderItem={({ item }) => (
               <ArtistCard
-                key={item.id || i}
                 id={item.id}
                 name={item.channelTitle || item.title || "Artist"}
                 thumbnailUrl={item.thumbnailUrl}
                 onPress={() => item.id && router.push(`/artist/${item.id}`)}
               />
-            ))}
-          </ScrollView>
+            )}
+          />
         </View>
       );
     }
 
-    // Default Grid (Playlist/Album)
     return (
-      <View key={index} style={styles.sectionContainer}>
-        {renderSectionHeader(section.title, true)}
-        <ScrollView 
-          horizontal 
+      <View style={styles.sectionContainer}>
+        <SectionHeader title={section.title} showRefresh={true} />
+        <FlatList
+          horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.horizontalScroll}
-        >
-          {section.items.map((item, i) => (
+          data={section.items}
+          keyExtractor={(item, i) => item.id || `${i}`}
+          renderItem={({ item }) => (
             <PlaylistCard
-              key={item.id || i}
               id={item.id}
               title={item.title}
               subtitle={item.channelTitle}
               thumbnailUrl={item.thumbnailUrl}
               onPress={() => handlePlayTrack(item, section.items)}
             />
-          ))}
-        </ScrollView>
+          )}
+        />
       </View>
     );
   };
 
+  const ListHeader = () => (
+    <>
+      {recentTracks.length > 0 && (
+        <View style={styles.sectionContainer}>
+          <SectionHeader title="Jam Again" showRefresh={false} />
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalScroll}
+            data={recentTracks.slice(0, 10)}
+            keyExtractor={(track) => track.videoId + '-recent'}
+            renderItem={({ item: track }) => (
+              <PlaylistCard
+                title={track.title}
+                subtitle={track.artist}
+                thumbnailUrl={track.thumbnailUrl}
+                onPress={() => handlePlayTrack(track, recentTracks)}
+              />
+            )}
+          />
+        </View>
+      )}
+    </>
+  );
+
+  if (loading) {
+    return (
+      <ScreenWrapper style={styles.container}>
+        <TopBar />
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#1db954" />
+        </View>
+      </ScreenWrapper>
+    );
+  }
+
   return (
     <ScreenWrapper style={styles.container}>
       <TopBar />
-      <ScrollView contentContainerStyle={styles.content}>
-        
-        {recentTracks.length > 0 && (
-            <View style={styles.sectionContainer}>
-                {renderSectionHeader("Jam Again")}
-                <ScrollView 
-                  horizontal 
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.horizontalScroll}
-                >
-                  {recentTracks.slice(0, 10).map((track, index) => (
-                    <PlaylistCard
-                      key={track.videoId + '-recent'}
-                      title={track.title}
-                      subtitle={track.artist}
-                      thumbnailUrl={track.thumbnailUrl}
-                      onPress={() => handlePlayTrack(track, recentTracks)}
-                    />
-                  ))}
-                </ScrollView>
-            </View>
-        )}
-
-        {loading ? (
-            <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color="#1db954" />
-            </View>
-        ) : (
-            sections.map((section, index) => renderSection(section, index))
-        )}
-
-      </ScrollView>
+      <FlatList
+        data={sections}
+        renderItem={renderSection}
+        keyExtractor={(item, index) => `${item.title}-${index}`}
+        ListHeaderComponent={ListHeader}
+        contentContainerStyle={styles.content}
+        removeClippedSubviews={true}
+        initialNumToRender={4}
+      />
     </ScreenWrapper>
   );
 }

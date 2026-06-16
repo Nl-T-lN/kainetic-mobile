@@ -1,15 +1,28 @@
-import { Redirect, usePathname } from 'expo-router';
+import { Redirect, usePathname, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 
 export default function NotFoundScreen() {
   const pathname = usePathname();
+  const router = useRouter();
   
   useEffect(() => {
-    console.log("[Router] Unmatched route caught:", pathname, "Redirecting to /");
-  }, [pathname]);
+    console.log("[Router] Unmatched route caught:", pathname);
+    
+    // When clicking the react-native-track-player notification, Android fires an intent
+    // which Expo Router captures as a deep link.
+    // Instead of resetting the app to home, we just go back to the previous screen.
+    if (pathname.includes('notification.click')) {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
+    }
+  }, [pathname, router]);
 
-  // When clicking the react-native-track-player notification, Android fires an intent
-  // that Expo Router sometimes fails to match to a known route.
-  // We simply redirect to the root which resolves to the home tabs.
+  if (pathname.includes('notification.click')) {
+    return null; // Render nothing while we navigate back
+  }
+
   return <Redirect href="/" />;
 }

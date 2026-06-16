@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList } from 'react-native';
+import React, { memo, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList, ListRenderItem } from 'react-native';
 import type { Track } from '@/types/music';
-import { Play, MoreVertical, Plus } from 'lucide-react-native';
+import { Play, MoreVertical } from 'lucide-react-native';
 import { usePlayerStore } from '@/store/playerStore';
 import { useRouter } from 'expo-router';
 
@@ -9,6 +9,8 @@ interface TrackListProps {
   tracks: Track[];
   onTrackSelect: (track: Track, index: number) => void;
   hideThumbnails?: boolean;
+  ListHeaderComponent?: React.ReactElement;
+  contentContainerStyle?: any;
 }
 
 function formatDuration(ms: number) {
@@ -19,83 +21,116 @@ function formatDuration(ms: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export function TrackList({ tracks, onTrackSelect, hideThumbnails }: TrackListProps) {
-  const currentTrack = usePlayerStore((state) => state.currentTrack);
+const TrackItem = memo(({ 
+  item, 
+  index, 
+  isActive, 
+  isPlaying, 
+  onPress, 
+  onArtistPress, 
+  hideThumbnails 
+}: { 
+  item: Track; 
+  index: number; 
+  isActive: boolean; 
+  isPlaying: boolean; 
+  onPress: () => void;
+  onArtistPress: () => void;
+  hideThumbnails?: boolean;
+}) => {
+  return (
+    <TouchableOpacity 
+      style={[styles.trackItem, isActive && styles.activeTrackItem]}
+      onPress={onPress}
+    >
+      <View style={styles.rowIndex}>
+        {isActive && isPlaying ? (
+          <View style={styles.eqBars}>
+             <View style={[styles.eqBar, { height: 12 }]} />
+             <View style={[styles.eqBar, { height: 6 }]} />
+             <View style={[styles.eqBar, { height: 14 }]} />
+          </View>
+        ) : isActive && !isPlaying ? (
+           <Play size={14} color="#34d399" fill="#34d399" />
+        ) : (
+          <Text style={[styles.rowNumber, isActive && styles.activeRowNumber]}>{index + 1}</Text>
+        )}
+      </View>
+
+      {!hideThumbnails && (
+        <Image 
+          source={{ uri: item.thumbnailUrl || "https://images.unsplash.com/photo-1619983081563-430f63602796?auto=format&fit=crop&q=80&w=200" }} 
+          style={styles.thumbnail} 
+        />
+      )}
+
+      <View style={styles.trackInfo}>
+        <Text style={[styles.title, isActive && styles.activeTitle]} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <TouchableOpacity onPress={onArtistPress}>
+          <Text style={styles.artist} numberOfLines={1}>
+            {item.artist || item.channelTitle || "Unknown Artist"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <Text style={styles.duration}>{formatDuration(item.durationMs)}</Text>
+      
+      <TouchableOpacity style={styles.moreButton}>
+        <MoreVertical size={16} color="rgba(255,255,255,0.4)" />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+});
+
+export function TrackList({ tracks, onTrackSelect, hideThumbnails, ListHeaderComponent, contentContainerStyle }: TrackListProps) {
+  const currentTrackId = usePlayerStore((state) => state.currentTrack?.videoId);
   const isPlaying = usePlayerStore((state) => state.isPlaying);
   const router = useRouter();
 
-  const renderItem = ({ item, index }: { item: Track; index: number }) => {
-    const isActive = item.videoId === currentTrack?.videoId;
+  const renderItem: ListRenderItem<Track> = useCallback(({ item, index }) => {
+    const isActive = item.videoId === currentTrackId;
+    
+    const handleArtistPress = () => {
+      if (item.artistId) {
+        router.push(`/artist/${item.artistId}`);
+      } else if (item.artist || item.channelTitle) {
+        router.push(`/search?q=${encodeURIComponent(item.artist || item.channelTitle || "")}`);
+      }
+    };
 
     return (
-      <TouchableOpacity 
-        style={[styles.trackItem, isActive && styles.activeTrackItem]}
+      <TrackItem 
+        item={item}
+        index={index}
+        isActive={isActive}
+        isPlaying={isPlaying}
         onPress={() => onTrackSelect(item, index)}
-      >
-        <View style={styles.rowIndex}>
-          {isActive && isPlaying ? (
-            <View style={styles.eqBars}>
-               {/* Static representation of EQ bars for native since we don't have CSS keyframes easily, but we can just use an icon or static lines */}
-               <View style={[styles.eqBar, { height: 12 }]} />
-               <View style={[styles.eqBar, { height: 6 }]} />
-               <View style={[styles.eqBar, { height: 14 }]} />
-            </View>
-          ) : isActive && !isPlaying ? (
-             <Play size={14} color="#34d399" fill="#34d399" />
-          ) : (
-            <Text style={[styles.rowNumber, isActive && styles.activeRowNumber]}>{index + 1}</Text>
-          )}
-        </View>
-
-        {!hideThumbnails && (
-          <Image 
-            source={{ uri: item.thumbnailUrl || "https://images.unsplash.com/photo-1619983081563-430f63602796?auto=format&fit=crop&q=80&w=200" }} 
-            style={styles.thumbnail} 
-          />
-        )}
-
-        <View style={styles.trackInfo}>
-          <Text style={[styles.title, isActive && styles.activeTitle]} numberOfLines={1}>
-            {item.title}
-          </Text>
-          <TouchableOpacity 
-            onPress={() => {
-              if (item.artistId) {
-                router.push(`/artist/${item.artistId}`);
-              } else if (item.artist || item.channelTitle) {
-                router.push(`/search?q=${encodeURIComponent(item.artist || item.channelTitle || "")}`);
-              }
-            }}
-          >
-            <Text style={styles.artist} numberOfLines={1}>
-              {item.artist || item.channelTitle || "Unknown Artist"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.duration}>{formatDuration(item.durationMs)}</Text>
-        
-        <TouchableOpacity style={styles.moreButton}>
-          <MoreVertical size={16} color="rgba(255,255,255,0.4)" />
-        </TouchableOpacity>
-      </TouchableOpacity>
+        onArtistPress={handleArtistPress}
+        hideThumbnails={hideThumbnails}
+      />
     );
-  };
+  }, [currentTrackId, isPlaying, onTrackSelect, hideThumbnails, router]);
 
   return (
-    <View style={styles.container}>
-      {tracks.map((track, index) => (
-        <React.Fragment key={`${track.videoId}-${index}`}>
-          {renderItem({ item: track, index })}
-        </React.Fragment>
-      ))}
-    </View>
+    <FlatList
+      data={tracks}
+      renderItem={renderItem}
+      keyExtractor={(item, index) => `${item.videoId}-${index}`}
+      ListHeaderComponent={ListHeaderComponent}
+      contentContainerStyle={[styles.listContent, contentContainerStyle]}
+      removeClippedSubviews={true}
+      maxToRenderPerBatch={10}
+      windowSize={5}
+      initialNumToRender={12}
+    />
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    width: '100%',
+  listContent: {
+    paddingBottom: 160,
   },
   trackItem: {
     flexDirection: 'row',
@@ -120,7 +155,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   activeRowNumber: {
-    color: '#34d399', // accent color
+    color: '#34d399',
   },
   eqBars: {
     flexDirection: 'row',

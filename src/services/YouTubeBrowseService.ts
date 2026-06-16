@@ -1,28 +1,6 @@
 import { Track } from '@/types/music';
+import { APIConfig, findKeys } from '@/config/APIConfig';
 import { getHighResThumbnail } from './YouTubeSearchService';
-
-const BROWSE_API = 'https://music.youtube.com/youtubei/v1/browse';
-
-const WEB_CLIENT_PAYLOAD = {
-  clientName: 'WEB_REMIX',
-  clientVersion: '1.20231214.00.00',
-  hl: 'en',
-  gl: 'US',
-};
-
-// Deep search helper
-function findKeys(obj: any, key: string, results: any[] = []): any[] {
-  if (typeof obj !== 'object' || obj === null) return results;
-  if (obj.hasOwnProperty(key)) {
-    results.push(obj[key]);
-  }
-  for (const k in obj) {
-    if (obj.hasOwnProperty(k)) {
-      findKeys(obj[k], key, results);
-    }
-  }
-  return results;
-}
 
 export interface BrowseResult {
   id: string;
@@ -45,7 +23,7 @@ export interface ArtistResult {
 export class YouTubeBrowseService {
   static async getArtist(id: string): Promise<ArtistResult> {
     try {
-      const response = await fetch(BROWSE_API, {
+      const response = await fetch(APIConfig.YOUTUBE.BROWSE_API, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -54,7 +32,7 @@ export class YouTubeBrowseService {
           'Referer': 'https://music.youtube.com/',
         },
         body: JSON.stringify({
-          context: { client: WEB_CLIENT_PAYLOAD },
+          context: { client: APIConfig.YOUTUBE.WEB_CLIENT_PAYLOAD },
           browseId: id,
         }),
       });
@@ -93,7 +71,7 @@ export class YouTubeBrowseService {
             const fixedColumns = item.fixedColumns || [];
             const durationText = fixedColumns[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
             let durationMs = 0;
-            if (durationText && /^\\d+:\\d{2}$/.test(durationText)) {
+            if (durationText && /^\d+:\d{2}$/.test(durationText)) {
               const parts = durationText.split(':');
               durationMs = (parseInt(parts[0]) * 60 + parseInt(parts[1])) * 1000;
             }
@@ -144,23 +122,20 @@ export class YouTubeBrowseService {
 
   static async getAlbumOrPlaylist(id: string): Promise<BrowseResult> {
     try {
-      // YouTube Music prefix for playlists is usually 'VL' for "Video List",
-      // but the API handles playlist browseIds directly if we pass them correctly.
-      // E.g. 'VLPL...' or just 'PL...'
       const browseId = id.startsWith('PL') || id.startsWith('RD') ? `VL${id}` : id;
 
-      const response = await fetch(BROWSE_API, {
+      const response = await fetch(APIConfig.YOUTUBE.BROWSE_API, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
           'X-YouTube-Client-Name': '67',
-          'X-YouTube-Client-Version': WEB_CLIENT_PAYLOAD.clientVersion,
+          'X-YouTube-Client-Version': APIConfig.YOUTUBE.WEB_CLIENT_PAYLOAD.clientVersion,
           'Origin': 'https://music.youtube.com',
           'Referer': 'https://music.youtube.com/',
         },
         body: JSON.stringify({
-          context: { client: WEB_CLIENT_PAYLOAD },
+          context: { client: APIConfig.YOUTUBE.WEB_CLIENT_PAYLOAD },
           browseId: browseId,
         }),
       });
@@ -171,7 +146,6 @@ export class YouTubeBrowseService {
 
       const data = await response.json();
 
-      // Extract Header Details
       let title = 'Unknown Title';
       let author = 'Unknown Artist';
       let thumbnailUrl = '';
@@ -191,7 +165,6 @@ export class YouTubeBrowseService {
          thumbnailUrl = getHighResThumbnail(thumb);
       }
 
-      // If no thumbnail from header, check microformat
       if (!thumbnailUrl) {
          const microformat = findKeys(data, 'microformatDataRenderer')[0];
          if (microformat?.thumbnail?.thumbnails) {
@@ -199,7 +172,6 @@ export class YouTubeBrowseService {
          }
       }
 
-      // Extract Tracks
       const tracks: Track[] = [];
       const renderers = findKeys(data, 'musicResponsiveListItemRenderer');
       
@@ -207,16 +179,13 @@ export class YouTubeBrowseService {
           const videoId = item.playlistItemData?.videoId || item.navigationEndpoint?.watchEndpoint?.videoId;
           if (!videoId) continue;
 
-          // For album tracks, the title is usually in the first flex column, but sometimes second if index is first
           let itemTitle = 'Unknown Track';
-          let itemAuthor = author; // Default to album author
+          let itemAuthor = author; 
           let durationMs = 0;
 
-          // Extract title
           const flexColumns = item.flexColumns || [];
           itemTitle = flexColumns[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text || itemTitle;
 
-          // Extract author (if it's a playlist, it might be in column 1)
           if (flexColumns.length > 1) {
               const runTexts = flexColumns[1]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.map((r: any) => r.text) || [];
               if (runTexts.length > 0) {
@@ -224,11 +193,10 @@ export class YouTubeBrowseService {
               }
           }
 
-          // Extract Duration from fixedColumns
           const fixedColumns = item.fixedColumns || [];
           const durationText = fixedColumns[0]?.musicResponsiveListItemFlexColumnRenderer?.text?.runs?.[0]?.text;
           
-          if (durationText && /^\\d+:\\d{2}$/.test(durationText)) {
+          if (durationText && /^\d+:\d{2}$/.test(durationText)) {
             const parts = durationText.split(':');
             durationMs = (parseInt(parts[0]) * 60 + parseInt(parts[1])) * 1000;
           }

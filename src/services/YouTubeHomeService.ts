@@ -1,28 +1,6 @@
 import { SearchResult } from '@/types/music';
+import { APIConfig, findKeys } from '@/config/APIConfig';
 import { getHighResThumbnail } from './YouTubeSearchService';
-
-const BROWSE_API = 'https://music.youtube.com/youtubei/v1/browse';
-
-const WEB_CLIENT_PAYLOAD = {
-  clientName: 'WEB_REMIX',
-  clientVersion: '1.20231214.00.00',
-  hl: 'en',
-  gl: 'US',
-};
-
-// Deep search helper
-function findKeys(obj: any, key: string, results: any[] = []): any[] {
-  if (typeof obj !== 'object' || obj === null) return results;
-  if (obj.hasOwnProperty(key)) {
-    results.push(obj[key]);
-  }
-  for (const k in obj) {
-    if (obj.hasOwnProperty(k)) {
-      findKeys(obj[k], key, results);
-    }
-  }
-  return results;
-}
 
 export interface HomeSection {
   title: string;
@@ -30,23 +8,20 @@ export interface HomeSection {
 }
 
 export class YouTubeHomeService {
-  /**
-   * Fetches the FEmusic_home endpoint and extracts sections like Recommended Mixes and Trending
-   */
   static async fetchHome(): Promise<HomeSection[]> {
     try {
-      const response = await fetch(BROWSE_API, {
+      const response = await fetch(APIConfig.YOUTUBE.BROWSE_API, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
           'X-YouTube-Client-Name': '67',
-          'X-YouTube-Client-Version': WEB_CLIENT_PAYLOAD.clientVersion,
+          'X-YouTube-Client-Version': APIConfig.YOUTUBE.WEB_CLIENT_PAYLOAD.clientVersion,
           'Origin': 'https://music.youtube.com',
           'Referer': 'https://music.youtube.com/',
         },
         body: JSON.stringify({
-          context: { client: WEB_CLIENT_PAYLOAD },
+          context: { client: APIConfig.YOUTUBE.WEB_CLIENT_PAYLOAD },
           browseId: 'FEmusic_home',
         }),
       });
@@ -67,7 +42,6 @@ export class YouTubeHomeService {
 
         const items: SearchResult[] = [];
         
-        // Parse TwoRow items (Playlists, Mixes, Artists, Albums)
         const twoRowItems = findKeys(shelf, 'musicTwoRowItemRenderer');
         for (const item of twoRowItems) {
             const browseId = item.navigationEndpoint?.browseEndpoint?.browseId;
@@ -81,8 +55,7 @@ export class YouTubeHomeService {
             const subtitle = item.subtitle?.runs?.map((r: any) => r.text).join('').replace(/•/g, '').trim() || 'Unknown';
             const thumbnailUrl = getHighResThumbnail(item.thumbnailRenderer?.musicThumbnailRenderer?.thumbnail);
             
-            // Determine type
-            let type: 'song' | 'playlist' | 'artist' | 'album' = 'playlist'; // Default to playlist for two-row items
+            let type: 'song' | 'playlist' | 'artist' | 'album' = 'playlist';
             if (browseId?.startsWith('UC')) type = 'artist';
             else if (browseId?.startsWith('MPRE')) type = 'album';
             
@@ -97,7 +70,6 @@ export class YouTubeHomeService {
             });
         }
         
-        // Parse Responsive items (Quick picks / Songs)
         const responsiveItems = findKeys(shelf, 'musicResponsiveListItemRenderer');
         for (const item of responsiveItems) {
             const videoId = item.playlistItemData?.videoId || item.navigationEndpoint?.watchEndpoint?.videoId;

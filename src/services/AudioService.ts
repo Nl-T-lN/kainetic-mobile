@@ -11,7 +11,7 @@ export class AudioService {
   static async init() {
     if (this.isSetup) return;
     try {
-      await TrackPlayer.setupPlayer();
+      await TrackPlayer.setupPlayer({ autoHandleInterruptions: true });
       await TrackPlayer.updateOptions({
         android: {
           appKilledPlaybackBehavior: AppKilledPlaybackBehavior.StopPlaybackAndRemoveNotification
