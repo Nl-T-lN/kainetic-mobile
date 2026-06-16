@@ -7,6 +7,7 @@ import { YouTubeHomeService, HomeSection } from '@/services/YouTubeHomeService';
 import { YouTubeSearchService } from '@/services/YouTubeSearchService';
 import type { Track, SearchResult } from '@/types/music';
 import TopBar from '@/components/ui/TopBar';
+import ScreenWrapper from '@/components/ui/ScreenWrapper';
 import { PlaylistCard } from '@/components/features/PlaylistCard';
 import { ArtistCard } from '@/components/features/ArtistCard';
 import { RecommendedTrackCard } from '@/components/features/RecommendedTrackCard';
@@ -213,7 +214,7 @@ export default function HomeTab() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <TopBar />
       <ScrollView contentContainerStyle={styles.content}>
         
@@ -247,7 +248,7 @@ export default function HomeTab() {
         )}
 
       </ScrollView>
-    </View>
+    </ScreenWrapper>
   );
 }
 

@@ -6,6 +6,8 @@ import { TrackList } from '@/components/features/TrackList';
 import { usePlayerStore } from '@/store/playerStore';
 import type { Track } from '@/types/music';
 
+import ScreenWrapper from '@/components/ui/ScreenWrapper';
+
 export default function RecentTab() {
   const recentTracks = useLibraryStore(state => state.recentTracks);
   const setCurrentTrack = usePlayerStore(state => state.setCurrentTrack);
@@ -17,7 +19,7 @@ export default function RecentTab() {
   };
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <TopBar />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.sectionHeader}>Recently Played</Text>
@@ -35,7 +37,7 @@ export default function RecentTab() {
           </View>
         )}
       </ScrollView>
-    </View>
+    </ScreenWrapper>
   );
 }
 

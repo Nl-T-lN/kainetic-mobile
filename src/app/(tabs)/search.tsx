@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Search, Clock, X } from 'lucide-react-native';
 import TopBar from '@/components/ui/TopBar';
+import ScreenWrapper from '@/components/ui/ScreenWrapper';
 import { TrackList } from '@/components/features/TrackList';
 import { PlaylistCard } from '@/components/features/PlaylistCard';
 import { ArtistCard } from '@/components/features/ArtistCard';
@@ -158,7 +159,7 @@ export default function SearchTab() {
   }));
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <TopBar />
       <View style={styles.searchBarContainer}>
         <Search color="#888" size={20} />
@@ -281,7 +282,7 @@ export default function SearchTab() {
           </>
         )}
       </ScrollView>
-    </View>
+    </ScreenWrapper>
   );
 }
 

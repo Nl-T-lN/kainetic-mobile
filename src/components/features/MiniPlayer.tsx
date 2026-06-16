@@ -6,6 +6,7 @@ import { useLibraryStore } from '@/store/libraryStore';
 import { BlurView } from 'expo-blur';
 import ExpandedPlayer from './ExpandedPlayer';
 import { AudioService } from '@/services/AudioService';
+import { getColors } from 'react-native-image-colors';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 // Android tab bar is ~65, iOS is ~85
@@ -31,6 +32,29 @@ export default function MiniPlayer() {
 
   const positionMs = usePlayerStore((state) => state.positionMs);
   const durationMs = usePlayerStore((state) => state.durationMs);
+  const dominantColor = usePlayerStore((state) => state.dominantColor);
+  const setDominantColor = usePlayerStore((state) => state.setDominantColor);
+
+  useEffect(() => {
+    if (currentTrack?.thumbnailUrl) {
+      getColors(currentTrack.thumbnailUrl, {
+        fallback: '#1E1E1E',
+        cache: true,
+        key: currentTrack.thumbnailUrl,
+      }).then((colors) => {
+        if (Platform.OS === 'android') {
+          // @ts-ignore
+          setDominantColor(colors.dominant || '#1E1E1E');
+        } else {
+          // @ts-ignore
+          setDominantColor(colors.primary || '#1E1E1E');
+        }
+      }).catch(err => {
+        console.warn('Failed to extract colors:', err);
+        setDominantColor('#1E1E1E');
+      });
+    }
+  }, [currentTrack?.thumbnailUrl]);
 
   const translateY = useRef(new Animated.Value(SNAP_BOTTOM)).current;
 
@@ -138,8 +162,8 @@ export default function MiniPlayer() {
         pointerEvents={isExpanded ? 'none' : 'auto'}
         {...panResponder.panHandlers}
       >
-        <View style={styles.miniPlayerWrapper}>
-          <View style={styles.miniPlayerContainer}>
+        <View style={[styles.miniPlayerWrapper, dominantColor ? { backgroundColor: dominantColor } : undefined]}>
+          <View style={[styles.miniPlayerContainer, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
             <TouchableOpacity 
               style={styles.trackInfo} 
               activeOpacity={0.8}

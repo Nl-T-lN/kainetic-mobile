@@ -5,6 +5,7 @@ import { ChevronDown, Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, MoreV
 import { BlurView } from 'expo-blur';
 import { usePlayerStore } from '@/store/playerStore';
 import { AudioService } from '@/services/AudioService';
+import { LinearGradient } from 'expo-linear-gradient';
 import LyricsTab from './LyricsTab';
 import QueueTab from './QueueTab';
 
@@ -109,6 +110,7 @@ export default function ExpandedPlayer({ isVisible, onClose, panHandlers }: Expa
   const playPrevious = usePlayerStore((state) => state.playPrevious);
   const positionMs = usePlayerStore((state) => state.positionMs);
   const durationMs = usePlayerStore((state) => state.durationMs);
+  const dominantColor = usePlayerStore((state) => state.dominantColor) || '#1E1E1E';
 
   const controlsOpacity = useRef(new Animated.Value(1)).current;
   const lastScrollY = useRef(0);
@@ -160,13 +162,12 @@ export default function ExpandedPlayer({ isVisible, onClose, panHandlers }: Expa
 
   return (
     <View style={[styles.container, { display: isVisible ? 'flex' : 'none' }]}>
-      {/* Background Artwork Blur */}
-      <Image 
-        source={{ uri: currentTrack.thumbnailUrl }} 
-        style={styles.backgroundImage} 
-        blurRadius={50} 
+      {/* Dynamic Gradient Background */}
+      <LinearGradient 
+        colors={[dominantColor, '#121212', '#000000']} 
+        locations={[0, 0.7, 1]}
+        style={StyleSheet.absoluteFill}
       />
-      <BlurView intensity={90} tint="dark" style={StyleSheet.absoluteFill} />
 
       <SafeAreaView style={styles.safeArea}>
         {/* Header - Attach panHandlers here so user can drag down from the top */}

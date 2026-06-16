@@ -10,6 +10,7 @@ interface PlayerStoreState {
   durationMs: number;
   isPlaying: boolean;
   audioQuality: 'AUTO' | 'HIGH' | 'LOW';
+  dominantColor: string | null;
 
   setCurrentTrack: (track: Track | null) => void;
   setQueue: (queue: Track[], index?: number) => void;
@@ -19,6 +20,7 @@ interface PlayerStoreState {
   setDurationMs: (dur: number) => void;
   setIsPlaying: (playing: boolean) => void;
   setAudioQuality: (quality: 'AUTO' | 'HIGH' | 'LOW') => void;
+  setDominantColor: (color: string | null) => void;
 }
 
 export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
@@ -29,6 +31,7 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   durationMs: 0,
   isPlaying: false,
   audioQuality: 'HIGH', // Default to high as requested
+  dominantColor: null,
 
   setCurrentTrack: (track) => {
     set({ currentTrack: track });
@@ -67,4 +70,5 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   setDurationMs: (dur) => set({ durationMs: dur }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   setAudioQuality: (quality) => set({ audioQuality: quality }),
+  setDominantColor: (color) => set({ dominantColor: color }),
 }));

@@ -4,11 +4,13 @@ import TopBar from '@/components/ui/TopBar';
 import { useLibraryStore } from '@/store/libraryStore';
 import { Plus } from 'lucide-react-native';
 
+import ScreenWrapper from '@/components/ui/ScreenWrapper';
+
 export default function LibraryTab() {
   const playlists = useLibraryStore(state => state.playlists);
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <TopBar />
       <ScrollView contentContainerStyle={styles.content}>
         <View style={styles.headerRow}>
@@ -40,7 +42,7 @@ export default function LibraryTab() {
           </View>
         )}
       </ScrollView>
-    </View>
+    </ScreenWrapper>
   );
 }
 

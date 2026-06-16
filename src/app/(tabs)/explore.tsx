@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router';
 import TopBar from '@/components/ui/TopBar';
 import type { Track } from '@/types/music';
 
+import ScreenWrapper from '@/components/ui/ScreenWrapper';
+
 const MOODS = [
   'Chill', 'Workout', 'Focus', 'Party', 'Sleep', 'Romance', 'Sad', 'Upbeat'
 ];
@@ -12,7 +14,7 @@ export default function ExploreTab() {
   const router = useRouter();
 
   return (
-    <View style={styles.container}>
+    <ScreenWrapper style={styles.container}>
       <TopBar />
       <ScrollView contentContainerStyle={styles.content}>
         
@@ -30,7 +32,7 @@ export default function ExploreTab() {
           <Text style={styles.placeholderText}>Charts will appear here.</Text>
         </View>
       </ScrollView>
-    </View>
+    </ScreenWrapper>
   );
 }
 
