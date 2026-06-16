@@ -134,65 +134,67 @@ export default function MiniPlayer() {
 
       {/* Mini Player */}
       <Animated.View 
-        style={[styles.miniPlayerWrapper, { opacity: miniPlayerOpacity }]}
+        style={[styles.miniPlayerShadowContainer, { opacity: miniPlayerOpacity }]}
         pointerEvents={isExpanded ? 'none' : 'auto'}
         {...panResponder.panHandlers}
       >
-        <BlurView intensity={95} tint="dark" style={styles.miniPlayerContainer}>
-          <TouchableOpacity 
-            style={styles.trackInfo} 
-            activeOpacity={0.8}
-            onPress={expandPlayer}
-          >
-            <Image source={{ uri: currentTrack.thumbnailUrl }} style={styles.thumbnail} />
-            <View style={styles.textContainer}>
-              <Text style={styles.title} numberOfLines={1}>{currentTrack.title}</Text>
-              <Text style={styles.artist} numberOfLines={1}>{currentTrack.artist}</Text>
-            </View>
-          </TouchableOpacity>
-
-          <View style={styles.controls}>
+        <View style={styles.miniPlayerWrapper}>
+          <View style={styles.miniPlayerContainer}>
             <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={() => toggleSaveTrack(currentTrack)}
+              style={styles.trackInfo} 
+              activeOpacity={0.8}
+              onPress={expandPlayer}
             >
-              <Heart size={22} color={isLiked ? "#54F790" : "#fff"} fill={isLiked ? "#54F790" : "transparent"} />
+              <Image source={{ uri: currentTrack.thumbnailUrl }} style={styles.thumbnail} />
+              <View style={styles.textContainer}>
+                <Text style={styles.title} numberOfLines={1}>{currentTrack.title}</Text>
+                <Text style={styles.artist} numberOfLines={1}>{currentTrack.artist}</Text>
+              </View>
             </TouchableOpacity>
 
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={async () => {
-                try {
-                  if (isPlaying) {
-                    await AudioService.pause();
-                  } else {
-                    await AudioService.resume();
+            <View style={styles.controls}>
+              <TouchableOpacity 
+                style={styles.iconButton}
+                onPress={() => toggleSaveTrack(currentTrack)}
+              >
+                <Heart size={22} color={isLiked ? "#54F790" : "#fff"} fill={isLiked ? "#54F790" : "transparent"} />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.iconButton}
+                onPress={async () => {
+                  try {
+                    if (isPlaying) {
+                      await AudioService.pause();
+                    } else {
+                      await AudioService.resume();
+                    }
+                  } catch (e) {
+                    console.error(e);
                   }
-                } catch (e) {
-                  console.error(e);
-                }
-              }}
-            >
-              {isPlaying ? (
-                <Pause size={24} color="#fff" fill="#fff" />
-              ) : (
-                <Play size={24} color="#fff" fill="#fff" style={{ marginLeft: 2 }} />
-              )}
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.iconButton}
-              onPress={playNext}
-            >
-              <SkipForward size={24} color="#fff" fill="#fff" />
-            </TouchableOpacity>
-          </View>
+                }}
+              >
+                {isPlaying ? (
+                  <Pause size={24} color="#fff" fill="#fff" />
+                ) : (
+                  <Play size={24} color="#fff" fill="#fff" style={{ marginLeft: 2 }} />
+                )}
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.iconButton}
+                onPress={playNext}
+              >
+                <SkipForward size={24} color="#fff" fill="#fff" />
+              </TouchableOpacity>
+            </View>
 
-          {/* Thin Progress Bar at the bottom matching Vintify Web */}
-          <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+            {/* Thin Progress Bar at the bottom matching Vintify Web */}
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${progressPercent}%` }]} />
+            </View>
           </View>
-        </BlurView>
+        </View>
       </Animated.View>
     </Animated.View>
   );
@@ -207,13 +209,23 @@ const styles = StyleSheet.create({
     height: SCREEN_HEIGHT,
     backgroundColor: 'transparent',
   },
-  miniPlayerWrapper: {
+  miniPlayerShadowContainer: {
     position: 'absolute',
-    top: 0, // Sits at the top of the sheet
+    top: 0,
     left: 0,
     right: 0,
     height: MINI_PLAYER_HEIGHT,
-    backgroundColor: 'transparent',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+  },
+  miniPlayerWrapper: {
+    flex: 1,
+    backgroundColor: '#1E1E1E', // Solid base to prevent transparency issues
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
     overflow: 'hidden',
   },
   miniPlayerContainer: {
@@ -222,9 +234,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(255, 255, 255, 0.04)', 
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: '#282828', // Nice solid dark background for the player
   },
   trackInfo: {
     flex: 1,

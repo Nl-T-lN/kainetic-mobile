@@ -24,9 +24,16 @@ const formatTime = (ms: number) => {
 };
 
 const CustomProgressBar = ({ positionMs, durationMs, onSeek }: { positionMs: number, durationMs: number, onSeek: (ms: number) => void }) => {
-  const [sliderWidth, setSliderWidth] = useState(0);
+  const [sliderWidthState, setSliderWidthState] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragValue, setDragValue] = useState(0);
+  
+  const sliderWidth = useRef(0);
+  const durationRef = useRef(0);
+  
+  // Keep refs in sync with state
+  sliderWidth.current = sliderWidthState;
+  durationRef.current = durationMs;
   
   const dragStartParams = useRef({ startX: 0, startMs: 0 });
 
@@ -37,24 +44,24 @@ const CustomProgressBar = ({ positionMs, durationMs, onSeek }: { positionMs: num
       onPanResponderGrant: (evt) => {
         setIsDragging(true);
         const x = evt.nativeEvent.locationX;
-        if (sliderWidth > 0) {
-           const p = Math.max(0, Math.min(1, x / sliderWidth));
-           setDragValue(p * durationMs);
-           dragStartParams.current = { startX: evt.nativeEvent.pageX, startMs: p * durationMs };
+        if (sliderWidth.current > 0) {
+           const p = Math.max(0, Math.min(1, x / sliderWidth.current));
+           setDragValue(p * durationRef.current);
+           dragStartParams.current = { startX: evt.nativeEvent.pageX, startMs: p * durationRef.current };
         }
       },
       onPanResponderMove: (evt, gestureState) => {
-        if (sliderWidth > 0) {
-           const msDelta = (gestureState.dx / sliderWidth) * durationMs;
-           const newMs = Math.max(0, Math.min(durationMs, dragStartParams.current.startMs + msDelta));
+        if (sliderWidth.current > 0) {
+           const msDelta = (gestureState.dx / sliderWidth.current) * durationRef.current;
+           const newMs = Math.max(0, Math.min(durationRef.current, dragStartParams.current.startMs + msDelta));
            setDragValue(newMs);
         }
       },
       onPanResponderRelease: (evt, gestureState) => {
         setIsDragging(false);
-        if (sliderWidth > 0) {
-           const msDelta = (gestureState.dx / sliderWidth) * durationMs;
-           const newMs = Math.max(0, Math.min(durationMs, dragStartParams.current.startMs + msDelta));
+        if (sliderWidth.current > 0) {
+           const msDelta = (gestureState.dx / sliderWidth.current) * durationRef.current;
+           const newMs = Math.max(0, Math.min(durationRef.current, dragStartParams.current.startMs + msDelta));
            onSeek(newMs);
         }
       },
@@ -71,13 +78,13 @@ const CustomProgressBar = ({ positionMs, durationMs, onSeek }: { positionMs: num
     <View style={styles.progressBarPlaceholder}>
       <View 
         style={styles.progressTrackContainer} 
-        onLayout={(e) => setSliderWidth(e.nativeEvent.layout.width)}
+        onLayout={(e) => setSliderWidthState(e.nativeEvent.layout.width)}
         {...panResponder.panHandlers}
       >
-        <View style={styles.progressTrack}>
+        <View style={styles.progressTrack} pointerEvents="none">
           <View style={[styles.progressFill, { width: `${percent}%` }]} />
         </View>
-        <View style={[styles.progressThumb, { left: `${percent}%` }]} />
+        <View style={[styles.progressThumb, { left: `${percent}%` }]} pointerEvents="none" />
       </View>
       <View style={styles.timeRow}>
         <Text style={styles.timeText}>{formatTime(currentMs)}</Text>
@@ -113,6 +120,12 @@ export default function ExpandedPlayer({ isVisible, onClose, panHandlers }: Expa
     Animated.spring(controlsOpacity, { toValue: 1, useNativeDriver: true }).start();
   };
 
+  React.useEffect(() => {
+    if (!isPlaying) {
+      Animated.spring(controlsOpacity, { toValue: 1, useNativeDriver: true }).start();
+    }
+  }, [isPlaying, controlsOpacity]);
+
   const handleScroll = (event: any) => {
     const currentY = event.nativeEvent.contentOffset.y;
     
@@ -139,6 +152,7 @@ export default function ExpandedPlayer({ isVisible, onClose, panHandlers }: Expa
   };
 
   const handleSeek = (ms: number) => {
+    usePlayerStore.getState().setPositionMs(ms);
     AudioService.seekTo(ms);
   };
 

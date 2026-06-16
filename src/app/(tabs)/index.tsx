@@ -75,28 +75,25 @@ export default function HomeTab() {
         }
       }
       
-      const mappedQueue: Track[] = list
-        .map(t => {
-            if ('type' in t) {
-                const st = t as SearchResult;
-                if (st.type !== 'song' || !st.videoId) return null;
-                return {
-                    videoId: st.videoId!,
-                    title: st.title,
-                    artist: st.channelTitle || 'Unknown Artist',
-                    thumbnailUrl: st.thumbnailUrl,
-                    durationMs: st.durationMs || 0
-                };
-            }
-            return t as Track;
-        })
-        .filter((t): t is Track => t !== null);
-        
-      const index = mappedQueue.findIndex(t => t.videoId === videoId);
-      const selectedTrack = mappedQueue[index >= 0 ? index : 0];
+      const mappedTrack: Track = {
+          videoId: videoId!,
+          title: item.title,
+          artist: item.channelTitle || ('artist' in item ? item.artist : 'Unknown Artist') || 'Unknown Artist',
+          thumbnailUrl: item.thumbnailUrl,
+          durationMs: item.durationMs || 0
+      };
       
-      setQueue(mappedQueue, index >= 0 ? index : 0);
-      setCurrentTrack(selectedTrack);
+      setQueue([mappedTrack], 0);
+      setCurrentTrack(mappedTrack);
+
+      YouTubeSearchService.getUpNext(mappedTrack.videoId).then(upNextTracks => {
+        if (upNextTracks.length > 0) {
+           const currentStore = usePlayerStore.getState();
+           if (currentStore.currentTrack?.videoId === mappedTrack.videoId) {
+              setQueue([mappedTrack, ...upNextTracks], 0);
+           }
+        }
+      }).catch(err => console.error("Failed to fetch UpNext", err));
     } catch (error) {
       console.error("Playback failed:", error);
     }

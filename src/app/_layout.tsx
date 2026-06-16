@@ -20,6 +20,7 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="+not-found" options={{ title: 'Oops!' }} />
       </Stack>
       {/* Global MiniPlayer overlaying the entire app (except when hidden by full player) */}
       <MiniPlayer />
