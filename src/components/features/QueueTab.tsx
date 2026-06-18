@@ -1,16 +1,42 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { usePlayerStore } from '@/store/playerStore';
-import { AudioService } from '@/services/AudioService';
+import { MoreVertical } from 'lucide-react-native';
 
 interface QueueTabProps {
   onScroll?: (event: any) => void;
+  paddingBottom?: number;
 }
 
-export default function QueueTab({ onScroll }: QueueTabProps) {
+const TrackItem = React.memo(({ item, index, queueIndex, onPlay }: any) => {
+  const isPlaying = index === queueIndex;
+  
+  return (
+    <TouchableOpacity 
+      style={[styles.trackItem, isPlaying && styles.playingTrackItem]}
+      onPress={() => onPlay(index)}
+    >
+      <Image source={{ uri: item.thumbnailUrl }} style={styles.thumbnail} />
+      <View style={styles.trackInfo}>
+        <Text style={[styles.title, isPlaying && styles.playingText]} numberOfLines={1}>
+          {item.title}
+        </Text>
+        <Text style={styles.artist} numberOfLines={1}>{item.artist}</Text>
+      </View>
+      <TouchableOpacity style={styles.moreButton}>
+        <MoreVertical color="rgba(255,255,255,0.6)" size={20} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+});
+
+export default function QueueTab({ onScroll, paddingBottom }: QueueTabProps) {
   const queue = usePlayerStore((state) => state.queue);
   const queueIndex = usePlayerStore((state) => state.queueIndex);
   const setQueue = usePlayerStore((state) => state.setQueue);
+  
+  const flatListRef = useRef<Animated.FlatList<any>>(null);
 
   if (!queue || queue.length === 0) {
     return (
@@ -20,42 +46,39 @@ export default function QueueTab({ onScroll }: QueueTabProps) {
     );
   }
 
-  const upcomingTracks = queue.slice(queueIndex + 1);
+  const handlePlayTrack = (index: number) => {
+    setQueue(queue, index);
+  };
 
-  const handlePlayTrack = (trackIndex: number) => {
-    // trackIndex is relative to upcomingTracks, so we add queueIndex + 1 to get the absolute index
-    const absoluteIndex = queueIndex + 1 + trackIndex;
-    setQueue(queue, absoluteIndex);
+  const renderItem = ({ item, index }: { item: any, index: number }) => {
+    return <TrackItem item={item} index={index} queueIndex={queueIndex} onPlay={handlePlayTrack} />;
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.headerTitle}>Up Next</Text>
-      
-      {upcomingTracks.length === 0 ? (
-        <Text style={styles.emptyText}>No upcoming tracks</Text>
-      ) : (
-        <FlatList
-          data={upcomingTracks}
-          keyExtractor={(item, index) => `${item.videoId}-${index}`}
-          renderItem={({ item, index }) => (
-            <TouchableOpacity 
-              style={styles.trackItem}
-              onPress={() => handlePlayTrack(index)}
-            >
-              <Image source={{ uri: item.thumbnailUrl }} style={styles.thumbnail} />
-              <View style={styles.trackInfo}>
-                <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.artist} numberOfLines={1}>{item.artist}</Text>
-              </View>
-            </TouchableOpacity>
-          )}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 40 }}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-        />
-      )}
+      <View style={styles.queueHeaderContainer}>
+        <View>
+          <Text style={styles.queueHeaderSub}>Playing from</Text>
+          <Text style={styles.queueHeaderMain}>Your Queue</Text>
+        </View>
+        <TouchableOpacity style={styles.saveButton}>
+          <Text style={styles.saveButtonText}>Save</Text>
+        </TouchableOpacity>
+      </View>
+      <Animated.FlatList
+        ref={flatListRef}
+        data={queue}
+        keyExtractor={(item, index) => `${item.videoId}-${index}`}
+        renderItem={renderItem}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: paddingBottom || 60 }}
+        onScroll={onScroll}
+        scrollEventThrottle={16}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
+      />
     </View>
   );
 }
@@ -63,15 +86,8 @@ export default function QueueTab({ onScroll }: QueueTabProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingTop: 16,
+    paddingTop: 8,
     width: '100%',
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-    marginBottom: 16,
-    paddingHorizontal: 8,
   },
   emptyText: {
     color: 'rgba(255,255,255,0.5)',
@@ -82,28 +98,69 @@ const styles = StyleSheet.create({
   trackItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 16,
+    paddingVertical: 8,
     paddingHorizontal: 8,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  playingTrackItem: {
+    backgroundColor: 'rgba(255,255,255,0.05)',
   },
   thumbnail: {
     width: 48,
     height: 48,
-    borderRadius: 8,
+    borderRadius: 6,
     backgroundColor: '#333',
   },
   trackInfo: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 14,
     justifyContent: 'center',
   },
   title: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    marginBottom: 4,
+    marginBottom: 3,
+  },
+  playingText: {
+    color: '#fff',
+    fontWeight: '800',
   },
   artist: {
     color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
+  },
+  moreButton: {
+    padding: 8,
+  },
+  queueHeaderContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    paddingHorizontal: 8,
+    marginBottom: 16,
+    marginTop: 16,
+  },
+  queueHeaderSub: {
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: 14,
+    marginBottom: 2,
+  },
+  queueHeaderMain: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  saveButton: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  saveButtonText: {
+    color: '#fff',
+    fontWeight: '600',
     fontSize: 14,
   }
 });

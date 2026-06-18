@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Keyboard } from 'react-native';
+import React, { useState, useEffect, useCallback, memo } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, TextInput, Keyboard, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Search, Clock, X } from 'lucide-react-native';
@@ -22,8 +22,31 @@ const FILTERS: { label: string; value: FilterType }[] = [
 
 const RECENT_SEARCHES_KEY = '@kainetic_recent_searches';
 
+const FilterTabs = memo(({ activeFilter, onFilterChange }: { activeFilter: FilterType, onFilterChange: (v: FilterType) => void }) => (
+  <View style={styles.filtersWrapper}>
+    <FlatList 
+      horizontal 
+      showsHorizontalScrollIndicator={false} 
+      data={FILTERS}
+      keyExtractor={item => item.value}
+      contentContainerStyle={styles.filtersContainer}
+      renderItem={({ item }) => (
+        <TouchableOpacity 
+          style={[styles.filterChip, activeFilter === item.value && styles.activeFilterChip]}
+          onPress={() => onFilterChange(item.value)}
+        >
+          <Text style={[styles.filterText, activeFilter === item.value && styles.activeFilterText]}>
+            {item.label}
+          </Text>
+        </TouchableOpacity>
+      )}
+    />
+  </View>
+));
+
 export default function SearchTab() {
   const router = useRouter();
+  const { width } = useWindowDimensions();
   const [searchQuery, setSearchQuery] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<FilterType>('song');
@@ -33,24 +56,15 @@ export default function SearchTab() {
   
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const setQueue = usePlayerStore((state) => state.setQueue);
-  const [loadingTrackId, setLoadingTrackId] = useState<string | null>(null);
 
   useEffect(() => {
     loadRecentSearches();
   }, []);
 
-  useEffect(() => {
-    if (submittedQuery.trim()) {
-      handleSearch(submittedQuery);
-    }
-  }, [activeFilter]);
-
   const loadRecentSearches = async () => {
     try {
       const stored = await AsyncStorage.getItem(RECENT_SEARCHES_KEY);
-      if (stored) {
-        setRecentSearches(JSON.parse(stored));
-      }
+      if (stored) setRecentSearches(JSON.parse(stored));
     } catch (e) {
       console.error('Failed to load recent searches', e);
     }
@@ -69,27 +83,13 @@ export default function SearchTab() {
   const clearRecentSearches = async () => {
     try {
       setRecentSearches([]);
-      await AsyncStorage.removeItem(RECENT_SEARCHES_KEY);
+      await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify([]));
     } catch (e) {
       console.error('Failed to clear recent searches', e);
     }
   };
 
-  const executeSearch = () => {
-    if (searchQuery.trim()) {
-      saveRecentSearch(searchQuery.trim());
-      setSubmittedQuery(searchQuery.trim());
-      handleSearch(searchQuery);
-    }
-  };
-
-  const handleRecentSearchClick = (query: string) => {
-    setSearchQuery(query);
-    setSubmittedQuery(query);
-    handleSearch(query);
-  };
-
-  const handleSearch = async (query: string) => {
+  const handleSearch = useCallback(async (query: string) => {
     if (!query.trim()) return;
     setIsSearching(true);
     Keyboard.dismiss();
@@ -102,9 +102,17 @@ export default function SearchTab() {
     } finally {
       setIsSearching(false);
     }
+  }, [activeFilter]);
+
+  const executeSearch = () => {
+    if (searchQuery.trim()) {
+      saveRecentSearch(searchQuery.trim());
+      setSubmittedQuery(searchQuery.trim());
+      handleSearch(searchQuery.trim());
+    }
   };
 
-  const handlePlayTrack = async (track: SearchResult | Track, index: number) => {
+  const handlePlayTrack = useCallback(async (track: SearchResult | Track, index: number) => {
     try {
       const isSearchResult = 'type' in track;
       if (isSearchResult) {
@@ -118,8 +126,6 @@ export default function SearchTab() {
       }
       
       const videoId = isSearchResult ? (track as SearchResult).videoId : (track as Track).videoId;
-      setLoadingTrackId(videoId!);
-      
       const mappedTrack: Track = {
         videoId: videoId!,
         title: track.title,
@@ -131,11 +137,9 @@ export default function SearchTab() {
       setQueue([mappedTrack], 0);
       setCurrentTrack(mappedTrack);
 
-      // Fetch Up Next tracks in the background
       YouTubeSearchService.getUpNext(mappedTrack.videoId).then(upNextTracks => {
         if (upNextTracks.length > 0) {
            const currentStore = usePlayerStore.getState();
-           // Only update queue if the user is still playing the same track
            if (currentStore.currentTrack?.videoId === mappedTrack.videoId) {
               setQueue([mappedTrack, ...upNextTracks], 0);
            }
@@ -144,19 +148,116 @@ export default function SearchTab() {
 
     } catch (error) {
       console.error("Playback failed:", error);
-      alert("Failed to extract or play this track.");
-    } finally {
-      setLoadingTrackId(null);
     }
-  };
+  }, [router, setCurrentTrack, setQueue]);
 
-  const mappedTracksForList: Track[] = searchResults.map(r => ({
-    videoId: r.videoId || '',
-    title: r.title,
-    artist: r.channelTitle || 'Unknown Artist',
-    thumbnailUrl: r.thumbnailUrl,
-    durationMs: r.durationMs || 0
-  }));
+  useEffect(() => {
+    if (submittedQuery.trim()) {
+      handleSearch(submittedQuery);
+    }
+  }, [activeFilter, submittedQuery, handleSearch]);
+
+  const renderContent = () => {
+    if (isSearching) {
+      return (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#1db954" />
+        </View>
+      );
+    }
+
+    if (searchResults.length === 0) {
+      if (submittedQuery) {
+        return (
+          <View style={styles.centerContainer}>
+            <Text style={styles.placeholderText}>No results found.</Text>
+          </View>
+        );
+      }
+      return (
+        <FlatList
+          key="recent-searches"
+          data={recentSearches}
+          keyExtractor={(item, index) => `${item}-${index}`}
+          ListHeaderComponent={<Text style={styles.sectionTitle}>Recent Searches</Text>}
+          ListHeaderComponentStyle={{ marginBottom: 16 }}
+          contentContainerStyle={styles.recentContainer}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={styles.recentItem}
+              onPress={() => {
+                setSearchQuery(item);
+                setSubmittedQuery(item);
+                handleSearch(item);
+              }}
+            >
+              <Clock color="#888" size={20} />
+              <Text style={styles.recentItemText}>{item}</Text>
+              <X color="#444" size={20} />
+            </TouchableOpacity>
+          )}
+          ListFooterComponent={recentSearches.length > 0 ? (
+            <TouchableOpacity onPress={clearRecentSearches} style={styles.clearButton}>
+              <Text style={styles.clearText}>Clear All Searches</Text>
+            </TouchableOpacity>
+          ) : null}
+        />
+      );
+    }
+
+    if (activeFilter === 'song') {
+      const songs = searchResults
+        .filter(r => r.type === 'song')
+        .map(r => ({
+          videoId: r.videoId || '',
+          title: r.title,
+          artist: r.channelTitle || 'Unknown Artist',
+          thumbnailUrl: r.thumbnailUrl,
+          durationMs: r.durationMs || 0
+        }));
+
+      return (
+        <TrackList 
+          tracks={songs} 
+          onTrackSelect={handlePlayTrack} 
+          contentContainerStyle={styles.trackListContent}
+        />
+      );
+    }
+
+    return (
+      <FlatList
+        key={`grid-${activeFilter}`}
+        data={searchResults.filter(r => r.type === activeFilter)}
+        numColumns={2}
+        keyExtractor={(item, i) => item.id || `${i}`}
+        columnWrapperStyle={styles.gridRow}
+        contentContainerStyle={styles.gridContent}
+        renderItem={({ item, index }) => (
+          <View style={styles.resultItem}>
+            {activeFilter === 'artist' ? (
+              <ArtistCard
+                id={item.id}
+                name={item.channelTitle || item.title || "Artist"}
+                thumbnailUrl={item.thumbnailUrl}
+                onPress={() => item.id && router.push(`/artist/${item.id}`)}
+                style={{ width: '100%', marginRight: 0 }}
+              />
+            ) : (
+              <PlaylistCard
+                id={item.id}
+                title={item.title}
+                subtitle={item.channelTitle}
+                thumbnailUrl={item.thumbnailUrl}
+                onPress={() => handlePlayTrack(item, index)}
+                style={{ width: '100%', marginRight: 0 }}
+              />
+            )}
+          </View>
+        )}
+      />
+    );
+  };
 
   return (
     <ScreenWrapper style={styles.container}>
@@ -171,7 +272,7 @@ export default function SearchTab() {
           value={searchQuery}
           onChangeText={(text) => {
             setSearchQuery(text);
-            if (text.trim() !== submittedQuery && searchResults.length > 0) {
+            if (text.trim() === '') {
               setSearchResults([]);
               setSubmittedQuery('');
             }
@@ -186,102 +287,11 @@ export default function SearchTab() {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
-        
-        {searchResults.length === 0 && !isSearching ? (
-          // Empty State: Recent Searches
-          <View style={styles.recentContainer}>
-            <View style={styles.recentHeader}>
-              <Text style={styles.sectionTitle}>Recent Searches</Text>
-              {recentSearches.length > 0 && (
-                <TouchableOpacity onPress={clearRecentSearches}>
-                  <Text style={styles.clearText}>Clear All</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-            
-            {recentSearches.length === 0 ? (
-              <Text style={styles.placeholderText}>Your recent searches will appear here.</Text>
-            ) : (
-              recentSearches.map((query, index) => (
-                <TouchableOpacity 
-                  key={index} 
-                  style={styles.recentItem}
-                  onPress={() => handleRecentSearchClick(query)}
-                >
-                  <Clock color="#888" size={20} />
-                  <Text style={styles.recentItemText}>{query}</Text>
-                  <X color="#444" size={20} />
-                </TouchableOpacity>
-              ))
-            )}
-          </View>
-        ) : (
-          // Active Search State
-          <>
-            {/* Filter Tabs */}
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filtersWrapper} contentContainerStyle={styles.filtersContainer}>
-              {FILTERS.map(filter => (
-                <TouchableOpacity 
-                  key={filter.value}
-                  style={[styles.filterChip, activeFilter === filter.value && styles.activeFilterChip]}
-                  onPress={() => setActiveFilter(filter.value)}
-                >
-                  <Text style={[styles.filterText, activeFilter === filter.value && styles.activeFilterText]}>
-                    {filter.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
+      <FilterTabs activeFilter={activeFilter} onFilterChange={setActiveFilter} />
 
-            {isSearching ? (
-              <View style={styles.centerContainer}>
-                <ActivityIndicator size="large" color="#1db954" />
-              </View>
-            ) : searchResults.length > 0 ? (
-              activeFilter === 'song' ? (
-                // List Layout for Tracks
-                <View style={styles.trackListContainer}>
-                  <TrackList 
-                    tracks={mappedTracksForList.filter(t => searchResults.find(r => r.videoId === t.videoId)?.type === 'song')} 
-                    onTrackSelect={handlePlayTrack} 
-                  />
-                </View>
-              ) : (
-                // Grid Layout for Albums, Artists, Playlists
-                <View style={styles.resultsGrid}>
-                  {searchResults.filter(r => r.type === activeFilter).map((result, i) => (
-                    <View key={result.videoId || result.id || i} style={styles.resultItem}>
-                      {activeFilter === 'artist' ? (
-                        <ArtistCard
-                          id={result.id}
-                          name={result.channelTitle || result.title || "Artist"}
-                          thumbnailUrl={result.thumbnailUrl}
-                          onPress={() => result.id && router.push(`/artist/${result.id}`)}
-                          style={{ width: '100%', marginRight: 0 }}
-                        />
-                      ) : (
-                        <PlaylistCard
-                          id={result.id}
-                          title={result.title}
-                          subtitle={result.channelTitle}
-                          thumbnailUrl={result.thumbnailUrl}
-                          onPress={() => handlePlayTrack(result, i)}
-                          style={{ width: '100%', marginRight: 0 }}
-                        />
-                      )}
-                    </View>
-                  ))}
-                </View>
-              )
-            ) : (
-              <View style={styles.centerContainer}>
-                <Text style={styles.placeholderText}>No results found for {FILTERS.find(f => f.value === activeFilter)?.label.toLowerCase()}.</Text>
-              </View>
-            )}
-          </>
-        )}
-      </ScrollView>
+      <View style={styles.flexContent}>
+        {renderContent()}
+      </View>
     </ScreenWrapper>
   );
 }
@@ -291,9 +301,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000',
   },
-  content: {
-    paddingTop: 10,
-    paddingBottom: 160,
+  flexContent: {
+    flex: 1,
   },
   searchBarContainer: {
     flexDirection: 'row',
@@ -313,12 +322,7 @@ const styles = StyleSheet.create({
   },
   recentContainer: {
     paddingHorizontal: 16,
-  },
-  recentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
+    paddingTop: 10,
   },
   sectionTitle: {
     color: '#fff',
@@ -326,8 +330,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: -0.5,
   },
+  clearButton: {
+    padding: 16,
+    alignItems: 'center',
+  },
   clearText: {
-    color: '#aaa',
+    color: '#888',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -348,18 +356,10 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 20,
   },
-  resultsTitle: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginLeft: 16,
-    marginBottom: 16,
-    letterSpacing: -0.5,
-  },
   filtersWrapper: {
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    marginBottom: 20,
+    marginBottom: 0,
   },
   filtersContainer: {
     paddingHorizontal: 8,
@@ -370,11 +370,8 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
-    backgroundColor: 'transparent',
-    borderRadius: 0,
   },
   activeFilterChip: {
-    backgroundColor: 'transparent',
     borderBottomColor: '#fff',
   },
   filterText: {
@@ -385,24 +382,27 @@ const styles = StyleSheet.create({
   activeFilterText: {
     color: '#fff',
   },
-  trackListContainer: {
+  trackListContent: {
     paddingHorizontal: 8,
+    paddingTop: 16,
+    paddingBottom: 160,
   },
-  resultsGrid: {
+  gridContent: {
     paddingHorizontal: 16,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    paddingTop: 20,
+    paddingBottom: 160,
+  },
+  gridRow: {
     justifyContent: 'space-between',
-    gap: 0, // Using percentage width and space-between instead of gap
   },
   resultItem: {
-    width: '47%', // roughly half the screen, leaving room for space-between
+    width: '47%',
     marginBottom: 24,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 50,
+    paddingBottom: 100,
   },
 });

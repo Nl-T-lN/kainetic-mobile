@@ -1,7 +1,8 @@
 import '../polyfill';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { View, StyleSheet } from 'react-native';
+import { StyleSheet } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import MiniPlayer from '@/components/features/MiniPlayer';
 import { AudioService } from '@/services/AudioService';
 import { useEffect } from 'react';
@@ -16,7 +17,7 @@ export default function RootLayout() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <GestureHandlerRootView style={styles.container}>
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -24,7 +25,7 @@ export default function RootLayout() {
       </Stack>
       {/* Global MiniPlayer overlaying the entire app (except when hidden by full player) */}
       <MiniPlayer />
-    </View>
+    </GestureHandlerRootView>
   );
 }
 
