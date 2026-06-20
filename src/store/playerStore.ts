@@ -21,6 +21,7 @@ interface PlayerStoreState {
   setIsPlaying: (playing: boolean) => void;
   setAudioQuality: (quality: 'AUTO' | 'HIGH' | 'LOW') => void;
   setDominantColor: (color: string | null) => void;
+  reorderQueue: (fromIndex: number, toIndex: number) => void;
 }
 
 export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
@@ -71,4 +72,25 @@ export const usePlayerStore = create<PlayerStoreState>((set, get) => ({
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   setAudioQuality: (quality) => set({ audioQuality: quality }),
   setDominantColor: (color) => set({ dominantColor: color }),
+
+  reorderQueue: (fromIndex, toIndex) => {
+    const { queue, queueIndex } = get();
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= queue.length || toIndex >= queue.length) return;
+
+    const newQueue = [...queue];
+    const [movedItem] = newQueue.splice(fromIndex, 1);
+    newQueue.splice(toIndex, 0, movedItem);
+
+    // Update queueIndex so the currently playing song doesn't jump
+    let newQueueIndex = queueIndex;
+    if (fromIndex === queueIndex) {
+      newQueueIndex = toIndex;
+    } else if (fromIndex < queueIndex && toIndex >= queueIndex) {
+      newQueueIndex--;
+    } else if (fromIndex > queueIndex && toIndex <= queueIndex) {
+      newQueueIndex++;
+    }
+
+    set({ queue: newQueue, queueIndex: newQueueIndex });
+  },
 }));

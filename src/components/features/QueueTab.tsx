@@ -1,33 +1,42 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { usePlayerStore } from '@/store/playerStore';
-import { MoreVertical } from 'lucide-react-native';
+import { MoreVertical, GripVertical } from 'lucide-react-native';
+import DraggableFlatList, { ScaleDecorator, RenderItemParams } from 'react-native-draggable-flatlist';
 
 interface QueueTabProps {
   onScroll?: (event: any) => void;
   paddingBottom?: number;
 }
 
-const TrackItem = React.memo(({ item, index, queueIndex, onPlay }: any) => {
+const TrackItem = React.memo(({ item, getIndex, drag, isActive, queueIndex, onPlay }: any) => {
+  const index = getIndex();
   const isPlaying = index === queueIndex;
   
   return (
-    <TouchableOpacity 
-      style={[styles.trackItem, isPlaying && styles.playingTrackItem]}
-      onPress={() => onPlay(index)}
-    >
-      <Image source={{ uri: item.thumbnailUrl }} style={styles.thumbnail} />
-      <View style={styles.trackInfo}>
-        <Text style={[styles.title, isPlaying && styles.playingText]} numberOfLines={1}>
-          {item.title}
-        </Text>
-        <Text style={styles.artist} numberOfLines={1}>{item.artist}</Text>
-      </View>
-      <TouchableOpacity style={styles.moreButton}>
-        <MoreVertical color="rgba(255,255,255,0.6)" size={20} />
+    <ScaleDecorator>
+      <TouchableOpacity 
+        style={[styles.trackItem, isPlaying && styles.playingTrackItem, isActive && styles.activeTrackItem]}
+        onPress={() => onPlay(index)}
+        activeOpacity={1}
+        disabled={isActive}
+      >
+        <TouchableOpacity onLongPress={drag} delayLongPress={100} style={styles.dragHandle}>
+          <GripVertical color="rgba(255,255,255,0.4)" size={20} />
+        </TouchableOpacity>
+
+        <Image source={{ uri: item.thumbnailUrl }} style={styles.thumbnail} />
+        <View style={styles.trackInfo}>
+          <Text style={[styles.title, isPlaying && styles.playingText]} numberOfLines={1}>
+            {item.title}
+          </Text>
+          <Text style={styles.artist} numberOfLines={1}>{item.artist}</Text>
+        </View>
+        <TouchableOpacity style={styles.moreButton}>
+          <MoreVertical color="rgba(255,255,255,0.6)" size={20} />
+        </TouchableOpacity>
       </TouchableOpacity>
-    </TouchableOpacity>
+    </ScaleDecorator>
   );
 });
 
@@ -35,8 +44,6 @@ export default function QueueTab({ onScroll, paddingBottom }: QueueTabProps) {
   const queue = usePlayerStore((state) => state.queue);
   const queueIndex = usePlayerStore((state) => state.queueIndex);
   const setQueue = usePlayerStore((state) => state.setQueue);
-  
-  const flatListRef = useRef<Animated.FlatList<any>>(null);
 
   if (!queue || queue.length === 0) {
     return (
@@ -46,13 +53,28 @@ export default function QueueTab({ onScroll, paddingBottom }: QueueTabProps) {
     );
   }
 
-  const handlePlayTrack = (index: number) => {
+  const handlePlayTrack = useCallback((index: number) => {
     setQueue(queue, index);
+  }, [queue, setQueue]);
+
+  const handleDragEnd = ({ data }: { data: any[] }) => {
+    const currentTrack = queue[queueIndex];
+    const newIndex = data.findIndex(t => t.videoId === currentTrack?.videoId);
+    setQueue(data, newIndex !== -1 ? newIndex : 0);
   };
 
-  const renderItem = ({ item, index }: { item: any, index: number }) => {
-    return <TrackItem item={item} index={index} queueIndex={queueIndex} onPlay={handlePlayTrack} />;
-  };
+  const renderItem = React.useCallback(({ item, getIndex, drag, isActive }: RenderItemParams<any>) => {
+    return (
+      <TrackItem 
+        item={item} 
+        getIndex={getIndex} 
+        drag={drag} 
+        isActive={isActive} 
+        queueIndex={queueIndex} 
+        onPlay={handlePlayTrack} 
+      />
+    );
+  }, [queueIndex, handlePlayTrack]);
 
   return (
     <View style={styles.container}>
@@ -65,11 +87,11 @@ export default function QueueTab({ onScroll, paddingBottom }: QueueTabProps) {
           <Text style={styles.saveButtonText}>Save</Text>
         </TouchableOpacity>
       </View>
-      <Animated.FlatList
-        ref={flatListRef}
+      <DraggableFlatList
         data={queue}
-        keyExtractor={(item, index) => `${item.videoId}-${index}`}
+        keyExtractor={(item) => item.videoId}
         renderItem={renderItem}
+        onDragEnd={handleDragEnd}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: paddingBottom || 60 }}
         onScroll={onScroll}
@@ -77,7 +99,7 @@ export default function QueueTab({ onScroll, paddingBottom }: QueueTabProps) {
         initialNumToRender={10}
         maxToRenderPerBatch={10}
         windowSize={5}
-        removeClippedSubviews={Platform.OS === 'android'}
+        removeClippedSubviews={false}
       />
     </View>
   );
@@ -106,6 +128,18 @@ const styles = StyleSheet.create({
   playingTrackItem: {
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
+  activeTrackItem: {
+    backgroundColor: '#282828',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
+    elevation: 10,
+  },
+  dragHandle: {
+    padding: 8,
+    marginRight: 4,
+  },
   thumbnail: {
     width: 48,
     height: 48,
@@ -114,7 +148,7 @@ const styles = StyleSheet.create({
   },
   trackInfo: {
     flex: 1,
-    marginLeft: 14,
+    marginLeft: 10,
     justifyContent: 'center',
   },
   title: {
