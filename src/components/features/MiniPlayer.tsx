@@ -280,11 +280,10 @@ export default function PremiumPlayerLayout() {
     return { transform: [{ translateY }] };
   });
 
-  // Fades out mini player content
+  // Fades out mini player content gracefully without layout collapse
   const miniPlayerStyle = useAnimatedStyle(() => {
     return {
       opacity: interpolate(playerProgress.value, [0, 0.2], [1, 0], clamp),
-      height: interpolate(playerProgress.value, [0, 0.2], [MINI_PLAYER_HEIGHT, 0], clamp)
     };
   });
 
@@ -294,10 +293,10 @@ export default function PremiumPlayerLayout() {
     };
   });
 
-  // Fades and scales Full Player controls in
+  // Fades out Full Player sheet only at the very bottom
   const fullPlayerStyle = useAnimatedStyle(() => {
     return {
-      opacity: interpolate(playerProgress.value, [0.4, 1], [0, 1], clamp)
+      opacity: interpolate(playerProgress.value, [0, 0.2], [0, 1], clamp)
     };
   });
 
