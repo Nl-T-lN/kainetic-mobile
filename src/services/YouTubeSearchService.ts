@@ -1,5 +1,6 @@
 import { SearchResult, Track } from '@/types/music';
 import { APIConfig, findKeys } from '@/config/APIConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export function getHighResThumbnail(thumbnails: any): string {
   if (!thumbnails) return "";
@@ -186,9 +187,28 @@ export class YouTubeSearchService {
       }
 
       // Filter out the seed track if it's the first one
-      return tracks.filter(t => t.videoId !== videoId);
+      const finalTracks = tracks.filter(t => t.videoId !== videoId);
+      
+      // Cache the result for offline use
+      if (finalTracks.length > 0) {
+        AsyncStorage.setItem(`@kainetic:upnext_cache_${videoId}`, JSON.stringify(finalTracks)).catch(console.error);
+      }
+
+      return finalTracks;
     } catch (e) {
-      console.error('[YouTubeSearchService] getUpNext Error:', e);
+      console.error('[YouTubeSearchService] getUpNext Error fetching from network:', e);
+      
+      // Fallback to offline cache
+      try {
+        const cached = await AsyncStorage.getItem(`@kainetic:upnext_cache_${videoId}`);
+        if (cached) {
+          console.log(`[YouTubeSearchService] Serving UpNext for ${videoId} from offline cache`);
+          return JSON.parse(cached);
+        }
+      } catch (cacheError) {
+        console.error('[YouTubeSearchService] Error reading UpNext cache:', cacheError);
+      }
+
       return [];
     }
   }

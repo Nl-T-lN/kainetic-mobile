@@ -209,7 +209,7 @@ export default function PremiumPlayerLayout() {
   };
 
   // --- GESTURE 1: Dragging the Mini Player Up / Full Player Down ---
-  const playerGesture = Gesture.Pan()
+  const createPlayerGesture = () => Gesture.Pan()
     .activeOffsetY([-10, 10])
     .onBegin(() => {
       playerContext.value = playerProgress.value;
@@ -224,12 +224,29 @@ export default function PremiumPlayerLayout() {
     .onEnd((event) => {
       if (tabSheetProgress.value > 0.1) return;
 
-      if (event.velocityY < -500 || playerProgress.value > 0.3) {
-        playerProgress.value = withTiming(1, { duration: 250 });
+      const isClosing = playerContext.value === 1;
+      
+      if (isClosing) {
+        // Dragging down from Full Player
+        if (event.velocityY > 500 || playerProgress.value < 0.8) {
+          playerProgress.value = withTiming(0, { duration: 250 });
+        } else {
+          playerProgress.value = withTiming(1, { duration: 250 });
+        }
       } else {
-        playerProgress.value = withTiming(0, { duration: 250 });
+        // Dragging up from Mini Player
+        if (event.velocityY < -500 || playerProgress.value > 0.2) {
+          playerProgress.value = withTiming(1, { duration: 250 });
+        } else {
+          playerProgress.value = withTiming(0, { duration: 250 });
+        }
       }
     });
+
+  const miniPlayerGesture = createPlayerGesture();
+  const fullPlayerGesture = createPlayerGesture();
+  const artworkGesture = createPlayerGesture();
+  const fullPlayerArtworkGesture = createPlayerGesture();
 
   // --- GESTURE 2: Tab Sheet Sliding ---
   const tabSheetGesture = Gesture.Pan()
@@ -368,7 +385,7 @@ export default function PremiumPlayerLayout() {
     <Animated.View style={[styles.masterContainer, masterContainerStyle]} pointerEvents="box-none">
       
       {/* SECTION A: MINI PLAYER LAYER */}
-      <GestureDetector gesture={playerGesture}>
+      <GestureDetector gesture={miniPlayerGesture}>
         <Animated.View animatedProps={miniPlayerProps} style={[styles.miniPlayerRow, miniPlayerStyle]}>
           <View style={[styles.miniPlayerWrapper, { backgroundColor: dominantColor }]}>
             <View style={[styles.miniPlayerInner, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
@@ -418,7 +435,7 @@ export default function PremiumPlayerLayout() {
           style={StyleSheet.absoluteFill}
         />
         <SafeAreaView style={styles.safeArea} pointerEvents="box-none">
-          <GestureDetector gesture={playerGesture}>
+          <GestureDetector gesture={fullPlayerGesture}>
             <View style={styles.header}>
               <TouchableOpacity onPress={toggleFullPlayer} style={styles.closeButton}>
                 <ChevronDown color="#fff" size={32} />
@@ -432,7 +449,7 @@ export default function PremiumPlayerLayout() {
 
           <View style={styles.mainContent} pointerEvents="box-none">
             {/* TOP AREA: Artwork + Title/Artist */}
-            <GestureDetector gesture={playerGesture}>
+            <GestureDetector gesture={fullPlayerArtworkGesture}>
               <View style={styles.topAreaColumn}>
                 <View style={styles.artworkLargeContainer}>
                   <View style={styles.artworkPlaceholder} />
@@ -511,7 +528,7 @@ export default function PremiumPlayerLayout() {
       </Modal>
 
       {/* SHARED ELEMENT ARTWORK OVERLAY */}
-      <GestureDetector gesture={playerGesture}>
+      <GestureDetector gesture={artworkGesture}>
         <Animated.Image 
           source={{ uri: currentTrack.thumbnailUrl }} 
           style={animatedArtworkStyle as any} 
