@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, useWindowDimensions, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, useWindowDimensions, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
 import { useRouter } from 'expo-router';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
@@ -18,20 +18,16 @@ import { RefreshCw } from 'lucide-react-native';
 // Global cache to prevent rate-limiting on hot reloads
 let cachedHomeSections: HomeSection[] | null = null;
 
-const SectionHeader = memo(({ title, showRefresh }: { title: string, showRefresh: boolean }) => {
+const SectionHeader = memo(({ title }: { title: string }) => {
   const isQuickPicks = title.toLowerCase().includes('quick picks') || title.toLowerCase().includes('recommendation');
   return (
     <View style={styles.sectionHeaderRow}>
       <Text style={styles.sectionHeader}>{title}</Text>
-      {isQuickPicks ? (
+      {isQuickPicks && (
         <TouchableOpacity style={styles.playAllButton}>
           <Text style={styles.playAllText}>Play all</Text>
         </TouchableOpacity>
-      ) : showRefresh ? (
-        <TouchableOpacity style={styles.iconButton}>
-          <RefreshCw size={16} color="rgba(255,255,255,0.6)" />
-        </TouchableOpacity>
-      ) : null}
+      )}
     </View>
   );
 });
@@ -43,12 +39,17 @@ export default function HomeTab() {
   const setQueue = usePlayerStore((state) => state.setQueue);
   const [sections, setSections] = useState<HomeSection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadHome = useCallback(async (force = false) => {
-    if (!force && cachedHomeSections) {
+  const loadHome = useCallback(async (force = false, isRefreshAction = false) => {
+    if (!force && cachedHomeSections && !isRefreshAction) {
       setSections(cachedHomeSections);
       setLoading(false);
       return;
+    }
+
+    if (isRefreshAction) {
+      setRefreshing(true);
     }
 
     try {
@@ -182,8 +183,15 @@ export default function HomeTab() {
       console.error('Failed to load home', err);
     } finally {
       setLoading(false);
+      if (isRefreshAction) {
+        setRefreshing(false);
+      }
     }
   }, []);
+
+  const onRefresh = useCallback(() => {
+    loadHome(true, true);
+  }, [loadHome]);
 
   useEffect(() => {
     loadHome();
@@ -236,7 +244,7 @@ export default function HomeTab() {
     if (titleLower.includes('jam again')) {
       return (
         <View style={styles.sectionContainer}>
-          <SectionHeader title={section.title} showRefresh={false} />
+          <SectionHeader title={section.title} />
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -270,7 +278,7 @@ export default function HomeTab() {
 
       return (
         <View style={styles.sectionContainer}>
-          <SectionHeader title={section.title} showRefresh={true} />
+          <SectionHeader title={section.title} />
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -317,7 +325,7 @@ export default function HomeTab() {
     if (isGridSimilarSection) {
       return (
         <View style={styles.sectionContainer}>
-          <SectionHeader title={section.title} showRefresh={true} />
+          <SectionHeader title={section.title} />
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -353,7 +361,7 @@ export default function HomeTab() {
 
       return (
         <View style={styles.sectionContainer}>
-          <SectionHeader title={section.title} showRefresh={true} />
+          <SectionHeader title={section.title} />
           <ScrollView 
             horizontal 
             showsHorizontalScrollIndicator={false}
@@ -388,7 +396,7 @@ export default function HomeTab() {
     if (isArtistSection) {
       return (
         <View style={styles.sectionContainer}>
-          <SectionHeader title={section.title} showRefresh={true} />
+          <SectionHeader title={section.title} />
           <FlatList
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -410,7 +418,7 @@ export default function HomeTab() {
 
     return (
       <View style={styles.sectionContainer}>
-        <SectionHeader title={section.title} showRefresh={true} />
+        <SectionHeader title={section.title} />
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -452,6 +460,14 @@ export default function HomeTab() {
         contentContainerStyle={styles.content}
         removeClippedSubviews={true}
         initialNumToRender={4}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor="#1db954"
+            colors={["#1db954"]} 
+          />
+        }
       />
     </ScreenWrapper>
   );
