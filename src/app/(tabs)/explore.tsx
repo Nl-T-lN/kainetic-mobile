@@ -15,7 +15,7 @@ export default function ExploreTab() {
 
   return (
     <ScreenWrapper style={styles.container}>
-      <TopBar />
+      <TopBar title="Explore" />
       <ScrollView contentContainerStyle={styles.content}>
         
         <Text style={styles.sectionHeader}>Browse Moods</Text>

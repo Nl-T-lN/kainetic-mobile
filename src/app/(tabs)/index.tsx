@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
-import { View, Text, StyleSheet, FlatList, ActivityIndicator, useWindowDimensions, TouchableOpacity, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, ActivityIndicator, useWindowDimensions, TouchableOpacity, ScrollView, RefreshControl, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { YouTubeHomeService, HomeSection } from '@/services/YouTubeHomeService';
@@ -40,6 +41,37 @@ export default function HomeTab() {
   const [sections, setSections] = useState<HomeSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const insets = useSafeAreaInsets();
+  const lastScrollY = React.useRef(0);
+  const translateY = React.useRef(new Animated.Value(0)).current;
+
+  const handleScroll = useCallback((event: any) => {
+    const currentY = event.nativeEvent.contentOffset.y;
+    const deltaY = currentY - lastScrollY.current;
+
+    if (currentY < 50) {
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
+    } else if (deltaY > 10) {
+      Animated.timing(translateY, {
+        toValue: -120,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    } else if (deltaY < -15) {
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    }
+
+    lastScrollY.current = currentY;
+  }, [translateY]);
 
   const loadHome = useCallback(async (force = false, isRefreshAction = false) => {
     if (!force && cachedHomeSections && !isRefreshAction) {
@@ -442,7 +474,7 @@ export default function HomeTab() {
   if (loading) {
     return (
       <ScreenWrapper style={styles.container}>
-        <TopBar />
+        <TopBar title="Home" />
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color="#1db954" />
         </View>
@@ -452,20 +484,36 @@ export default function HomeTab() {
 
   return (
     <ScreenWrapper style={styles.container}>
-      <TopBar />
-      <FlatList
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: '#000', zIndex: 101 }} />
+      <Animated.View 
+        style={{ 
+          transform: [{ translateY }], 
+          position: 'absolute', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          zIndex: 100,
+          backgroundColor: 'rgba(0,0,0,0.85)'
+        }}
+      >
+        <TopBar title="Home" />
+      </Animated.View>
+      <Animated.FlatList
         data={sections}
         renderItem={renderSection}
         keyExtractor={(item, index) => `${item.title}-${index}`}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingTop: 100 }]}
         removeClippedSubviews={true}
         initialNumToRender={4}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         refreshControl={
           <RefreshControl 
             refreshing={refreshing} 
             onRefresh={onRefresh} 
             tintColor="#1db954"
             colors={["#1db954"]} 
+            progressViewOffset={100}
           />
         }
       />

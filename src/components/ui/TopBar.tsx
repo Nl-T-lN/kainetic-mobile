@@ -4,14 +4,14 @@ import { User, Settings, Radio } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 
-export default function TopBar() {
+export default function TopBar({ title = "kainetic" }: { title?: string }) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
   return (
     <View style={[styles.container, { paddingTop: Math.max(insets.top, 20) }]}>
       <View style={styles.inner}>
-        <Text style={styles.logoText}>kainetic</Text>
+        <Text style={styles.logoText}>{title}</Text>
 
         <View style={styles.actions}>
           <TouchableOpacity style={styles.iconButton} onPress={() => router.push('/parties')}>

@@ -44,7 +44,7 @@ export default function LibraryTab() {
 
   return (
     <ScreenWrapper style={styles.container}>
-      <TopBar />
+      <TopBar title="Library" />
       <ScrollView contentContainerStyle={styles.content}>
         
         {/* Playlists Section */}

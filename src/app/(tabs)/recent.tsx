@@ -20,7 +20,7 @@ export default function RecentTab() {
 
   return (
     <ScreenWrapper style={styles.container}>
-      <TopBar />
+      <TopBar title="Recent" />
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.sectionHeader}>Recently Played</Text>
 

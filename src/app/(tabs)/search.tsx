@@ -261,7 +261,7 @@ export default function SearchTab() {
 
   return (
     <ScreenWrapper style={styles.container}>
-      <TopBar />
+      <TopBar title="Search" />
       <View style={styles.searchBarContainer}>
         <Search color="#888" size={20} />
         <TextInput 
