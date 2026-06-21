@@ -11,6 +11,8 @@ import ScreenWrapper from '@/components/ui/ScreenWrapper';
 import { PlaylistCard } from '@/components/features/PlaylistCard';
 import { ArtistCard } from '@/components/features/ArtistCard';
 import { RecommendedTrackCard } from '@/components/features/RecommendedTrackCard';
+import { SpeedDialCard } from '@/components/features/SpeedDialCard';
+import { SongGridCard } from '@/components/features/SongGridCard';
 import { RefreshCw } from 'lucide-react-native';
 
 // Global cache to prevent rate-limiting on hot reloads
@@ -39,8 +41,6 @@ export default function HomeTab() {
   const { width } = useWindowDimensions();
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const setQueue = usePlayerStore((state) => state.setQueue);
-  const recentTracks = useLibraryStore((state) => state.recentTracks) || [];
-  
   const [sections, setSections] = useState<HomeSection[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -53,29 +53,127 @@ export default function HomeTab() {
 
     try {
       const stateRecentTracks = useLibraryStore.getState().recentTracks || [];
-      const quickPicksSeed = (stateRecentTracks.length > 0 && stateRecentTracks[0].videoId) ? stateRecentTracks[0].videoId : 'fHI8X4OXluQ';
+      const hasHistory = stateRecentTracks.length > 0;
+      
+      const similarToSeeds: any[] = [];
+      const seenArtists = new Set<string>();
+      
+      if (hasHistory) {
+        for (const track of stateRecentTracks) {
+          if (track.videoId === stateRecentTracks[0].videoId) continue;
+          const artist = track.artist.split(',')[0].trim();
+          if (!seenArtists.has(artist)) {
+            seenArtists.add(artist);
+            similarToSeeds.push(track);
+          }
+          if (similarToSeeds.length >= 3) break;
+        }
+      }
 
-      const [homeSections, quickPicksTracks] = await Promise.all([
-        YouTubeHomeService.fetchHome(),
-        YouTubeSearchService.getUpNext(quickPicksSeed)
-      ]);
+      const promises: Promise<any>[] = [
+        YouTubeHomeService.fetchHome()
+      ];
 
-      const filteredSections = homeSections.filter(s => 
+      if (hasHistory) {
+        promises.push(YouTubeSearchService.getUpNext(stateRecentTracks[0].videoId)); // Quick Picks Seed
+        similarToSeeds.forEach(seed => {
+          promises.push(YouTubeSearchService.getUpNext(seed.videoId));
+        });
+      }
+
+      const results = await Promise.all(promises);
+      const homeSections = results[0];
+      const quickPicksTracks = hasHistory ? results[1] : null;
+      const similarToResults = hasHistory ? results.slice(2) : [];
+
+      const filteredSections = homeSections.filter((s: any) => 
         !s.title.toLowerCase().includes('quick picks') && 
         !s.title.toLowerCase().includes('recommend')
       );
 
       const newSections: HomeSection[] = [];
+      
+      const speedDialItems: any[] = [];
+      const localPlaylists = useLibraryStore.getState().playlists || [];
+      localPlaylists.slice(0, 4).forEach((p: any) => {
+        speedDialItems.push({
+          id: p.id,
+          videoId: '',
+          title: p.name,
+          artist: 'Playlist',
+          thumbnailUrl: p.coverUrl || 'https://via.placeholder.com/150',
+          type: 'playlist'
+        });
+      });
+
+      if (hasHistory) {
+        stateRecentTracks.slice(0, 15).forEach((t: any) => {
+          speedDialItems.push({
+            ...t,
+            id: t.videoId,
+            type: 'song'
+          });
+        });
+      }
+
+      homeSections.forEach((section: any) => {
+        section.items.forEach((item: any) => {
+           if ((item.type === 'artist' || item.type === 'album' || item.type === 'playlist') && speedDialItems.length < 27) {
+             if (!speedDialItems.some(existing => existing.id === item.id)) {
+                speedDialItems.push(item);
+             }
+           }
+        });
+      });
+
+      if (speedDialItems.length > 0) {
+        newSections.push({
+          title: "Speed dial",
+          items: speedDialItems.sort(() => Math.random() - 0.5).slice(0, 27)
+        });
+      }
+
+      if (hasHistory) {
+        newSections.push({
+          title: "Jam Again",
+          items: stateRecentTracks.slice(0, 10).map((t: any) => ({
+            ...t,
+            id: t.videoId,
+            type: 'playlist'
+          })) as any
+        });
+      }
+
       if (quickPicksTracks && quickPicksTracks.length > 0) {
         newSections.push({
           title: "Quick Picks",
-          items: quickPicksTracks.slice(0, 20).map(t => ({
+          items: quickPicksTracks.slice(0, 20).map((t: any) => ({
             ...t,
             id: t.videoId,
             type: 'song'
           })) as any
         });
       }
+
+      similarToSeeds.forEach((seed, index) => {
+        const tracks = similarToResults[index];
+        if (tracks && tracks.length > 0) {
+          const primaryArtist = seed.artist.split(',')[0].trim();
+          
+          let shelfTitle = `Similar to ${primaryArtist}`;
+          if (index === 1) shelfTitle = `Because you listened to ${seed.title}`;
+          else if (index === 2) shelfTitle = `More like ${primaryArtist}`;
+
+          newSections.push({
+            title: shelfTitle,
+            items: tracks.slice(0, 10).map((t: any) => ({
+              ...t,
+              id: t.videoId,
+              type: 'song'
+            })) as any
+          });
+        }
+      });
 
       const finalSections = [...newSections, ...filteredSections];
       cachedHomeSections = finalSections;
@@ -131,8 +229,118 @@ export default function HomeTab() {
   }, [router, setCurrentTrack, setQueue]);
 
   const renderSection = ({ item: section, index }: { item: HomeSection, index: number }) => {
+    const titleLower = section.title.toLowerCase();
     const isSongSection = section.items[0]?.type === 'song';
-    const isArtistSection = section.items[0]?.type === 'artist' || section.title.toLowerCase().includes('artist');
+    const isArtistSection = section.items[0]?.type === 'artist' || titleLower.includes('artist');
+
+    if (titleLower.includes('jam again')) {
+      return (
+        <View style={styles.sectionContainer}>
+          <SectionHeader title={section.title} showRefresh={false} />
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalScroll}
+            data={section.items}
+            keyExtractor={(item, i) => (item.id || item.videoId) + '-jam-' + i}
+            renderItem={({ item }) => (
+              <PlaylistCard
+                id={item.id}
+                title={item.title}
+                subtitle={item.channelTitle || (item as any).artist || 'Unknown Artist'}
+                thumbnailUrl={item.thumbnailUrl}
+                onPress={() => handlePlayTrack(item, section.items)}
+              />
+            )}
+          />
+        </View>
+      );
+    }
+
+    if (titleLower.includes('speed dial')) {
+      const columnWidth = width * 0.88;
+      const gap = 8;
+      const itemWidth = (columnWidth - (gap * 2)) / 3;
+      
+      const chunkSize = 9;
+      const chunks = [];
+      for (let i = 0; i < section.items.length; i += chunkSize) {
+        chunks.push(section.items.slice(i, i + chunkSize));
+      }
+
+      return (
+        <View style={styles.sectionContainer}>
+          <SectionHeader title={section.title} showRefresh={true} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalScroll}
+            snapToInterval={columnWidth + 16}
+            decelerationRate="fast"
+            snapToAlignment="start"
+          >
+            {chunks.map((chunk, chunkIdx) => (
+              <View 
+                key={`chunk-${chunkIdx}`} 
+                style={{ 
+                  width: columnWidth, 
+                  flexDirection: 'row', 
+                  flexWrap: 'wrap', 
+                  gap: gap,
+                  marginRight: 16
+                }}
+              >
+                {chunk.map((item, i) => (
+                  <SpeedDialCard
+                    key={`${item.id || item.videoId}-${i}`}
+                    title={item.title}
+                    thumbnailUrl={item.thumbnailUrl}
+                    isPlayable={item.type === 'song'}
+                    onPress={() => {
+                      if (item.type === 'song') handlePlayTrack(item, section.items);
+                      else if (item.type === 'artist') router.push(`/artist/${item.id}`);
+                      else if (item.type === 'album') router.push(`/album/${item.id}`);
+                      else if (item.type === 'playlist') router.push(`/playlist/${item.id}`);
+                    }}
+                    width={itemWidth}
+                  />
+                ))}
+              </View>
+            ))}
+          </ScrollView>
+        </View>
+      );
+    }
+
+    const isGridSimilarSection = titleLower.includes('similar to') || titleLower.includes('because you listened to') || titleLower.includes('more like');
+
+    if (isGridSimilarSection) {
+      return (
+        <View style={styles.sectionContainer}>
+          <SectionHeader title={section.title} showRefresh={true} />
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.horizontalScroll}
+            data={section.items}
+            keyExtractor={(item, i) => item.id || `${i}`}
+            renderItem={({ item }) => (
+              <SongGridCard
+                track={{
+                  videoId: item.videoId || item.id || '',
+                  title: item.title,
+                  artist: item.channelTitle || (item as any).artist || 'Unknown Artist',
+                  thumbnailUrl: item.thumbnailUrl,
+                  durationMs: item.durationMs || 0,
+                }}
+                onPress={() => handlePlayTrack(item, section.items)}
+                width={120}
+              />
+            )}
+          />
+        </View>
+      );
+    }
 
     if (isSongSection) {
       const chunkSize = 4;
@@ -163,7 +371,7 @@ export default function HomeTab() {
                     track={{
                         videoId: item.videoId || item.id || '',
                         title: item.title,
-                        artist: item.channelTitle || 'Unknown Artist',
+                        artist: item.channelTitle || (item as any).artist || 'Unknown Artist',
                         thumbnailUrl: item.thumbnailUrl,
                         durationMs: item.durationMs || 0,
                     }}
@@ -223,31 +431,6 @@ export default function HomeTab() {
     );
   };
 
-  const ListHeader = () => (
-    <>
-      {recentTracks.length > 0 && (
-        <View style={styles.sectionContainer}>
-          <SectionHeader title="Jam Again" showRefresh={false} />
-          <FlatList
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.horizontalScroll}
-            data={recentTracks.slice(0, 10)}
-            keyExtractor={(track) => track.videoId + '-recent'}
-            renderItem={({ item: track }) => (
-              <PlaylistCard
-                title={track.title}
-                subtitle={track.artist}
-                thumbnailUrl={track.thumbnailUrl}
-                onPress={() => handlePlayTrack(track, recentTracks)}
-              />
-            )}
-          />
-        </View>
-      )}
-    </>
-  );
-
   if (loading) {
     return (
       <ScreenWrapper style={styles.container}>
@@ -266,7 +449,6 @@ export default function HomeTab() {
         data={sections}
         renderItem={renderSection}
         keyExtractor={(item, index) => `${item.title}-${index}`}
-        ListHeaderComponent={ListHeader}
         contentContainerStyle={styles.content}
         removeClippedSubviews={true}
         initialNumToRender={4}

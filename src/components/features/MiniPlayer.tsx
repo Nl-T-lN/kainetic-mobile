@@ -27,6 +27,8 @@ const MINI_PLAYER_HEIGHT = 64;
 const BOTTOM_NAV_HEIGHT = TAB_BAR_HEIGHT;
 const ARTWORK_SIZE = SCREEN_WIDTH - 64;
 
+import { BouncyButton } from '../ui/BouncyButton';
+
 const clamp = Extrapolation.CLAMP;
 
 const formatTime = (ms: number) => {
@@ -35,32 +37,6 @@ const formatTime = (ms: number) => {
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
-};
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-
-const BouncyButton = ({ onPress, children, style, rippleRadius = 24, activeOpacity, ...props }: any) => {
-  const scale = useSharedValue(1);
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }]
-  }));
-
-  return (
-    <AnimatedPressable
-      onPress={onPress}
-      onPressIn={() => {
-        scale.value = withTiming(0.85, { duration: 100 });
-      }}
-      onPressOut={() => {
-        scale.value = withSpring(1, { damping: 15, stiffness: 350, mass: 0.8 });
-      }}
-      android_ripple={{ color: 'rgba(255,255,255,0.2)', borderless: true, radius: rippleRadius }}
-      style={[style, animatedStyle]}
-      {...props}
-    >
-      {children}
-    </AnimatedPressable>
-  );
 };
 
 const MiniProgressBar = () => {
@@ -222,8 +198,8 @@ export default function PremiumPlayerLayout() {
       return false;
     };
 
-    BackHandler.addEventListener('hardwareBackPress', onBackPress);
-    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backHandler.remove();
   }, []);
 
   const togglePlayPause = async () => {

@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, Image } from 'react-native';
+import { BouncyButton } from '../ui/BouncyButton';
 
 interface ArtistCardProps {
   id?: string;
@@ -11,30 +12,31 @@ interface ArtistCardProps {
 
 export function ArtistCard({ name, thumbnailUrl, onPress, style }: ArtistCardProps) {
   return (
-    <TouchableOpacity style={[styles.card, style]} onPress={onPress} activeOpacity={0.8}>
+    <BouncyButton style={[styles.card, style]} onPress={onPress} scaleValue={0.94}>
       <Image source={{ uri: thumbnailUrl }} style={styles.image} />
-      <Text style={styles.name} numberOfLines={1}>{name}</Text>
-    </TouchableOpacity>
+      <Text style={styles.name} numberOfLines={2}>{name}</Text>
+    </BouncyButton>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    width: 110, // Match max-width 800px width from web
+    width: 120, 
     alignItems: 'center',
     marginRight: 16,
+    marginBottom: 16,
   },
   image: {
-    width: 110,
-    height: 110,
-    borderRadius: 55, // 50% for circle
-    marginBottom: 8,
+    width: 120,
+    height: 120,
+    borderRadius: 60, 
+    marginBottom: 12,
     backgroundColor: 'rgba(255,255,255,0.05)',
   },
   name: {
     color: '#fff',
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     textAlign: 'center',
     width: '100%',
   }
