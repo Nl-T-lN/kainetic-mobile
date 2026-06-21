@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Platform, PanResponder, Modal } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Image, Dimensions, Platform, PanResponder, Modal, BackHandler } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { 
@@ -7,6 +7,7 @@ import Animated, {
   useAnimatedStyle, 
   useAnimatedProps,
   withTiming, 
+  withSpring,
   interpolate, 
   Extrapolation,
   runOnJS
@@ -36,7 +37,48 @@ const formatTime = (ms: number) => {
   return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 };
 
-const CustomProgressBar = ({ positionMs, durationMs, onSeek }: { positionMs: number, durationMs: number, onSeek: (ms: number) => void }) => {
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+const BouncyButton = ({ onPress, children, style, rippleRadius = 24, activeOpacity, ...props }: any) => {
+  const scale = useSharedValue(1);
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }]
+  }));
+
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={() => {
+        scale.value = withTiming(0.85, { duration: 100 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, { damping: 15, stiffness: 350, mass: 0.8 });
+      }}
+      android_ripple={{ color: 'rgba(255,255,255,0.2)', borderless: true, radius: rippleRadius }}
+      style={[style, animatedStyle]}
+      {...props}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+};
+
+const MiniProgressBar = () => {
+  const positionMs = usePlayerStore((state) => state.positionMs);
+  const durationMs = usePlayerStore((state) => state.durationMs);
+  const progressPercent = durationMs > 0 ? (positionMs / durationMs) * 100 : 0;
+  
+  return (
+    <View style={styles.progressTrackMini}>
+      <View style={[styles.progressFillMini, { width: `${progressPercent}%` }]} />
+    </View>
+  );
+};
+
+const CustomProgressBar = ({ onSeek }: { onSeek: (ms: number) => void }) => {
+  const positionMs = usePlayerStore((state) => state.positionMs);
+  const durationMs = usePlayerStore((state) => state.durationMs);
+
   const [sliderWidthState, setSliderWidthState] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragValue, setDragValue] = useState(0);
@@ -111,8 +153,6 @@ export default function PremiumPlayerLayout() {
   const isPlaying = usePlayerStore((state) => state.isPlaying);
   const playNext = usePlayerStore((state) => state.playNext);
   const playPrevious = usePlayerStore((state) => state.playPrevious);
-  const positionMs = usePlayerStore((state) => state.positionMs);
-  const durationMs = usePlayerStore((state) => state.durationMs);
   const dominantColor = usePlayerStore((state) => state.dominantColor) || '#1E1E1E';
   const setDominantColor = usePlayerStore((state) => state.setDominantColor);
   
@@ -128,7 +168,6 @@ export default function PremiumPlayerLayout() {
   const playerContext = useSharedValue(0);
   
   // 0 = Queue Sheet hidden, 1 = Queue Sheet full screen
-  const [isQueueOpen, setIsQueueOpen] = useState(false);
   const QUEUE_SNAP_TOP = insets.top + 10;
   const QUEUE_SNAP_PEEK = SCREEN_HEIGHT * 0.35; // 65% of screen height from top
   const QUEUE_SNAP_CLOSED = SCREEN_HEIGHT;
@@ -136,40 +175,56 @@ export default function PremiumPlayerLayout() {
   const queueTranslateY = useSharedValue(SCREEN_HEIGHT);
   const queueSheetContext = useSharedValue(0);
 
-  const closeQueueSheet = useCallback(() => {
-    setIsQueueOpen(false);
-  }, []);
-
-  const openQueueSheet = () => {
-    queueTranslateY.value = SCREEN_HEIGHT;
-    setIsQueueOpen(true);
+  const closeQueueSheet = () => {
+    queueTranslateY.value = withSpring(QUEUE_SNAP_CLOSED, { damping: 25, stiffness: 350, overshootClamping: true });
   };
 
-  useEffect(() => {
-    if (isQueueOpen) {
-      queueTranslateY.value = withTiming(QUEUE_SNAP_PEEK, { duration: 350 });
-    }
-  }, [isQueueOpen, queueTranslateY, QUEUE_SNAP_PEEK]);
+  const openQueueSheet = () => {
+    queueTranslateY.value = withSpring(QUEUE_SNAP_PEEK, { damping: 25, stiffness: 350, overshootClamping: true });
+  };
   const tabSheetProgress = useSharedValue(0);
   const tabContext = useSharedValue(0);
 
   useEffect(() => {
     let isMounted = true;
-    if (currentTrack?.thumbnailUrl) {
-      getColors(currentTrack.thumbnailUrl, {
+    const currentUrl = currentTrack?.thumbnailUrl;
+    if (currentUrl) {
+      getColors(currentUrl, {
         fallback: '#1E1E1E',
         cache: true,
-        key: currentTrack.thumbnailUrl,
+        key: currentUrl,
+        quality: 'lowest',
       }).then((colors) => {
-        if (!isMounted) return;
+        if (!isMounted || usePlayerStore.getState().currentTrack?.thumbnailUrl !== currentUrl) return;
         const color = Platform.OS === 'android' ? (colors as any).dominant : (colors as any).primary;
         setDominantColor(color || '#1E1E1E');
       }).catch(err => {
-        if (isMounted) setDominantColor('#1E1E1E');
+        if (isMounted && usePlayerStore.getState().currentTrack?.thumbnailUrl === currentUrl) setDominantColor('#1E1E1E');
       });
     }
     return () => { isMounted = false; };
   }, [currentTrack?.thumbnailUrl, setDominantColor]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      if (queueTranslateY.value < QUEUE_SNAP_CLOSED - 10) {
+        closeQueueSheet();
+        return true;
+      }
+      if (tabSheetProgress.value > 0.1) {
+        closeTab();
+        return true;
+      }
+      if (playerProgress.value > 0.1) {
+        toggleFullPlayer();
+        return true;
+      }
+      return false;
+    };
+
+    BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+  }, []);
 
   const togglePlayPause = async () => {
     try {
@@ -192,18 +247,19 @@ export default function PremiumPlayerLayout() {
 
   const openTab = (tab: 'LYRICS' | 'QUEUE') => {
     setActiveTab(tab);
-    tabSheetProgress.value = withTiming(1, { duration: 250 });
+    tabSheetProgress.value = withSpring(1, { damping: 25, stiffness: 350, overshootClamping: true });
   };
 
   const closeTab = () => {
-    tabSheetProgress.value = withTiming(0, { duration: 250 });
+    tabSheetProgress.value = withSpring(0, { damping: 25, stiffness: 350, overshootClamping: true });
+    setTimeout(() => setActiveTab(null), 300);
   };
 
   const toggleFullPlayer = () => {
     if (playerProgress.value < 0.5) {
-      playerProgress.value = withTiming(1, { duration: 250 });
+      playerProgress.value = withSpring(1, { damping: 25, stiffness: 350, overshootClamping: true });
     } else {
-      playerProgress.value = withTiming(0, { duration: 250 });
+      playerProgress.value = withSpring(0, { damping: 25, stiffness: 350, overshootClamping: true });
       if (tabSheetProgress.value > 0) closeTab();
     }
   };
@@ -211,7 +267,7 @@ export default function PremiumPlayerLayout() {
   // --- GESTURE 1: Dragging the Mini Player Up / Full Player Down ---
   const createPlayerGesture = () => Gesture.Pan()
     .activeOffsetY([-10, 10])
-    .onBegin(() => {
+    .onStart(() => {
       playerContext.value = playerProgress.value;
     })
     .onUpdate((event) => {
@@ -224,21 +280,21 @@ export default function PremiumPlayerLayout() {
     .onEnd((event) => {
       if (tabSheetProgress.value > 0.1) return;
 
-      const isClosing = playerContext.value === 1;
+      const isClosing = playerContext.value > 0.5;
       
       if (isClosing) {
         // Dragging down from Full Player
-        if (event.velocityY > 500 || playerProgress.value < 0.8) {
-          playerProgress.value = withTiming(0, { duration: 250 });
+        if (event.velocityY > 300 || playerProgress.value < 0.85) {
+          playerProgress.value = withSpring(0, { damping: 25, stiffness: 350, overshootClamping: true });
         } else {
-          playerProgress.value = withTiming(1, { duration: 250 });
+          playerProgress.value = withSpring(1, { damping: 25, stiffness: 350, overshootClamping: true });
         }
       } else {
         // Dragging up from Mini Player
-        if (event.velocityY < -500 || playerProgress.value > 0.2) {
-          playerProgress.value = withTiming(1, { duration: 250 });
+        if (event.velocityY < -300 || playerProgress.value > 0.15) {
+          playerProgress.value = withSpring(1, { damping: 25, stiffness: 350, overshootClamping: true });
         } else {
-          playerProgress.value = withTiming(0, { duration: 250 });
+          playerProgress.value = withSpring(0, { damping: 25, stiffness: 350, overshootClamping: true });
         }
       }
     });
@@ -250,7 +306,7 @@ export default function PremiumPlayerLayout() {
 
   // --- GESTURE 2: Tab Sheet Sliding ---
   const tabSheetGesture = Gesture.Pan()
-    .onBegin(() => {
+    .onStart(() => {
       tabContext.value = tabSheetProgress.value;
     })
     .onUpdate((event) => {
@@ -259,11 +315,11 @@ export default function PremiumPlayerLayout() {
       tabSheetProgress.value = Math.max(0, Math.min(1, tabContext.value + delta));
     })
     .onEnd((event) => {
-      if (event.velocityY > 500 || tabSheetProgress.value < 0.7) {
-        tabSheetProgress.value = withTiming(0, { duration: 250 });
+      if (event.velocityY > 300 || tabSheetProgress.value < 0.8) {
+        tabSheetProgress.value = withSpring(0, { damping: 25, stiffness: 350, overshootClamping: true });
         runOnJS(setActiveTab)(null); // Reset active tab when closed
       } else {
-        tabSheetProgress.value = withTiming(1, { duration: 250 });
+        tabSheetProgress.value = withSpring(1, { damping: 25, stiffness: 350, overshootClamping: true });
       }
     });
 
@@ -338,7 +394,7 @@ export default function PremiumPlayerLayout() {
   });
 
   const queueSheetGesture = Gesture.Pan()
-    .onBegin(() => {
+    .onStart(() => {
       queueSheetContext.value = queueTranslateY.value;
     })
     .onUpdate((event) => {
@@ -346,18 +402,19 @@ export default function PremiumPlayerLayout() {
       queueTranslateY.value = Math.max(QUEUE_SNAP_TOP, newY);
     })
     .onEnd((event) => {
-      const targetY = queueTranslateY.value + event.velocityY * 0.2;
-      
-      if (targetY > QUEUE_SNAP_PEEK + (QUEUE_SNAP_CLOSED - QUEUE_SNAP_PEEK) * 0.4 || event.velocityY > 1000) {
-        queueTranslateY.value = withTiming(QUEUE_SNAP_CLOSED, { duration: 300 }, (finished) => {
-          if (finished) runOnJS(closeQueueSheet)();
-        });
-      } else if (targetY < QUEUE_SNAP_PEEK * 0.5 && event.velocityY < -500) {
-        queueTranslateY.value = withTiming(QUEUE_SNAP_TOP, { duration: 300 });
-      } else if (targetY < QUEUE_SNAP_PEEK) {
-        queueTranslateY.value = withTiming(QUEUE_SNAP_TOP, { duration: 300 });
+      const isFromPeek = queueSheetContext.value > QUEUE_SNAP_TOP + 10;
+      if (isFromPeek) {
+        if (event.velocityY > 300 || queueTranslateY.value > QUEUE_SNAP_PEEK + 60) {
+          queueTranslateY.value = withSpring(QUEUE_SNAP_CLOSED, { damping: 25, stiffness: 350, overshootClamping: true });
+        } else {
+          queueTranslateY.value = withSpring(QUEUE_SNAP_PEEK, { damping: 25, stiffness: 350, overshootClamping: true });
+        }
       } else {
-        queueTranslateY.value = withTiming(QUEUE_SNAP_PEEK, { duration: 300 });
+        if (event.velocityY < -300 || queueTranslateY.value < QUEUE_SNAP_PEEK - 60) {
+          queueTranslateY.value = withSpring(QUEUE_SNAP_TOP, { damping: 25, stiffness: 350, overshootClamping: true });
+        } else {
+          queueTranslateY.value = withSpring(QUEUE_SNAP_PEEK, { damping: 25, stiffness: 350, overshootClamping: true });
+        }
       }
     });
 
@@ -376,8 +433,6 @@ export default function PremiumPlayerLayout() {
   if (!currentTrack) return null;
 
   const isLiked = savedTracks.some(t => t.videoId === currentTrack.videoId);
-  const progressPercent = durationMs > 0 ? (positionMs / durationMs) * 100 : 0;
-
 
 
   return (
@@ -388,39 +443,37 @@ export default function PremiumPlayerLayout() {
         <Animated.View animatedProps={miniPlayerProps} style={[styles.miniPlayerRow, miniPlayerStyle]}>
           <View style={[styles.miniPlayerWrapper, { backgroundColor: dominantColor }]}>
             <View style={[styles.miniPlayerInner, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
-              <TouchableOpacity 
+              <BouncyButton 
                 style={styles.trackInfo} 
-                activeOpacity={0.8}
                 onPress={toggleFullPlayer}
+                rippleRadius={200}
               >
                 <View style={styles.thumbnailPlaceholder} />
                 <View style={styles.textContainer}>
                   <Text style={styles.miniTitle} numberOfLines={1}>{currentTrack.title}</Text>
                   <Text style={styles.miniArtist} numberOfLines={1}>{currentTrack.artist}</Text>
                 </View>
-              </TouchableOpacity>
+              </BouncyButton>
 
               <View style={styles.miniControls}>
-                <TouchableOpacity style={styles.iconButton} onPress={() => toggleSaveTrack(currentTrack)}>
+                <BouncyButton style={styles.iconButton} onPress={() => toggleSaveTrack(currentTrack)}>
                   <Heart size={22} color={isLiked ? "#54F790" : "#fff"} fill={isLiked ? "#54F790" : "transparent"} />
-                </TouchableOpacity>
+                </BouncyButton>
 
-                <TouchableOpacity style={styles.iconButton} onPress={togglePlayPause}>
+                <BouncyButton style={styles.iconButton} onPress={togglePlayPause}>
                   {isPlaying ? (
-                    <Pause size={24} color="#fff" fill="#fff" />
+                    <Pause color="#fff" size={24} fill="#fff" />
                   ) : (
-                    <Play size={24} color="#fff" fill="#fff" style={{ marginLeft: 2 }} />
+                    <Play color="#fff" size={24} fill="#fff" />
                   )}
-                </TouchableOpacity>
+                </BouncyButton>
                 
-                <TouchableOpacity style={styles.iconButton} onPress={playNext}>
-                  <SkipForward size={24} color="#fff" fill="#fff" />
-                </TouchableOpacity>
+                <BouncyButton style={styles.iconButton} onPress={playNext}>
+                  <SkipForward color="#fff" size={24} fill="#fff" />
+                </BouncyButton>
               </View>
 
-              <View style={styles.progressTrackMini}>
-                <View style={[styles.progressFillMini, { width: `${progressPercent}%` }]} />
-              </View>
+              <MiniProgressBar />
             </View>
           </View>
         </Animated.View>
@@ -436,13 +489,13 @@ export default function PremiumPlayerLayout() {
         <SafeAreaView style={styles.safeArea} pointerEvents="box-none">
           <GestureDetector gesture={fullPlayerGesture}>
             <View style={styles.header}>
-              <TouchableOpacity onPress={toggleFullPlayer} style={styles.closeButton}>
+              <BouncyButton onPress={toggleFullPlayer} style={styles.closeButton} rippleRadius={32}>
                 <ChevronDown color="#fff" size={32} />
-              </TouchableOpacity>
+              </BouncyButton>
               <Text style={styles.headerTitle}>Now Playing</Text>
-              <TouchableOpacity style={styles.moreButton}>
+              <BouncyButton style={styles.moreButton} rippleRadius={24}>
                 <MoreVertical color="#fff" size={24} />
-              </TouchableOpacity>
+              </BouncyButton>
             </View>
           </GestureDetector>
 
@@ -465,73 +518,64 @@ export default function PremiumPlayerLayout() {
 
             {/* BOTTOM AREA: Animated Controls */}
             <View style={styles.bottomArea}>
-              <CustomProgressBar positionMs={positionMs} durationMs={durationMs} onSeek={handleSeek} />
+              <CustomProgressBar onSeek={handleSeek} />
 
               <View style={styles.controls}>
-                <TouchableOpacity style={styles.secondaryButton}>
+                <BouncyButton style={styles.secondaryButton} rippleRadius={24}>
                   <Shuffle color="rgba(255,255,255,0.5)" size={24} />
-                </TouchableOpacity>
+                </BouncyButton>
 
                 <View style={styles.mainControlsCenter}>
-                  <TouchableOpacity onPress={playPrevious} style={styles.controlButton}>
+                  <BouncyButton onPress={playPrevious} style={styles.controlButton} rippleRadius={36}>
                     <SkipBack color="#fff" size={36} fill="#fff" />
-                  </TouchableOpacity>
+                  </BouncyButton>
 
-                  <TouchableOpacity onPress={togglePlayPause} style={styles.playButton}>
+                  <BouncyButton onPress={togglePlayPause} style={styles.playButton} rippleRadius={48}>
                     {isPlaying ? (
-                      <Pause color="#000" size={36} fill="#000" />
+                      <Pause color="#fff" size={36} fill="#fff" />
                     ) : (
-                      <Play color="#000" size={36} fill="#000" style={{ marginLeft: 4 }} />
+                      <Play color="#fff" size={36} fill="#fff" style={{ marginLeft: 4 }} />
                     )}
-                  </TouchableOpacity>
+                  </BouncyButton>
 
-                  <TouchableOpacity onPress={playNext} style={styles.controlButton}>
+                  <BouncyButton onPress={playNext} style={styles.controlButton} rippleRadius={36}>
                     <SkipForward color="#fff" size={36} fill="#fff" />
-                  </TouchableOpacity>
+                  </BouncyButton>
                 </View>
 
-                <TouchableOpacity style={styles.secondaryButton}>
+                <BouncyButton style={styles.secondaryButton} rippleRadius={24}>
                   <Repeat color="rgba(255,255,255,0.5)" size={24} />
-                </TouchableOpacity>
+                </BouncyButton>
               </View>
             </View>
 
             {/* UP NEXT TAB BUTTON */}
-            <TouchableOpacity style={styles.upNextTabButton} onPress={openQueueSheet} activeOpacity={0.7}>
+            <BouncyButton style={styles.upNextTabButton} onPress={openQueueSheet} rippleRadius={28}>
               <Text style={styles.upNextTabText}>Up Next</Text>
-            </TouchableOpacity>
+            </BouncyButton>
           </View>
         </SafeAreaView>
       </Animated.View>
 
-      {/* DEDICATED QUEUE MODAL SHEET */}
-      <Modal
-        visible={isQueueOpen}
-        animationType="none"
-        transparent={true}
-        onRequestClose={closeQueueSheet}
-      >
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <Animated.View style={[styles.queueSheetContainer, queueSheetStyle, { backgroundColor: dominantColor || '#111' }]}>
-            <LinearGradient colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.95)', '#000']} style={StyleSheet.absoluteFillObject} />
-            <View style={{ flex: 1, paddingTop: 10 }}>
-              <GestureDetector gesture={queueSheetGesture}>
+      {/* DEDICATED QUEUE SHEET (Cached persistently) */}
+      <Animated.View style={[styles.queueSheetContainer, queueSheetStyle, { backgroundColor: dominantColor || '#111' }]}>
+        <LinearGradient colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0.95)', '#000']} style={StyleSheet.absoluteFill} />
+        <View style={{ flex: 1, paddingTop: 10 }}>
+          <GestureDetector gesture={queueSheetGesture}>
                 <View style={styles.queueSheetDragArea}>
                   <View style={styles.dragHandle} />
                 </View>
               </GestureDetector>
-              <QueueTab paddingBottom={QUEUE_SNAP_PEEK + 40} />
-            </View>
-          </Animated.View>
-        </GestureHandlerRootView>
-      </Modal>
+          <QueueTab paddingBottom={QUEUE_SNAP_PEEK + 40} />
+        </View>
+      </Animated.View>
 
       {/* SHARED ELEMENT ARTWORK OVERLAY */}
       <GestureDetector gesture={artworkGesture}>
         <Animated.Image 
           source={{ uri: currentTrack.thumbnailUrl }} 
           style={animatedArtworkStyle as any} 
-          animatedProps={artworkProps}
+          animatedProps={artworkProps as any}
         />
       </GestureDetector>
     </Animated.View>

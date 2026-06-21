@@ -53,7 +53,9 @@ export default function QueueTab({ onScroll, paddingBottom }: QueueTabProps) {
     );
   }
 
-  const handlePlayTrack = useCallback((index: number) => {
+  const displayQueue = queue;
+
+  const handlePlayTrack = React.useCallback((index: number) => {
     setQueue(queue, index);
   }, [queue, setQueue]);
 
@@ -88,7 +90,7 @@ export default function QueueTab({ onScroll, paddingBottom }: QueueTabProps) {
         </TouchableOpacity>
       </View>
       <DraggableFlatList
-        data={queue}
+        data={displayQueue}
         keyExtractor={(item) => item.videoId}
         renderItem={renderItem}
         onDragEnd={handleDragEnd}

@@ -54,7 +54,7 @@ export class AudioService {
         if (event.state === State.Playing) {
           usePlayerStore.getState().setIsPlaying(true);
           this.startProgressTracker();
-        } else {
+        } else if (event.state === State.Paused || event.state === State.Stopped) {
           usePlayerStore.getState().setIsPlaying(false);
           this.stopProgressTracker();
         }
@@ -103,6 +103,12 @@ export class AudioService {
       }
 
       console.log(`[AudioService] Success! Received URL: ${result.url.substring(0, 50)}...`);
+
+      // Race condition safety: Did the user skip tracks while we were extracting?
+      if (usePlayerStore.getState().currentTrack?.videoId !== videoId) {
+        console.log(`[AudioService] Aborting playback for ${videoId}, track was skipped during extraction.`);
+        return;
+      }
 
       await TrackPlayer.reset();
       await TrackPlayer.add({
