@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { Play } from 'lucide-react-native';
+import { getResizedImage } from '@/utils/image';
 
 interface PlaylistCardProps {
   id?: string;
@@ -15,7 +17,7 @@ export function PlaylistCard({ title, subtitle, thumbnailUrl, onPress, style }: 
   return (
     <TouchableOpacity style={[styles.card, style]} onPress={onPress} activeOpacity={0.8}>
       <View style={styles.imageContainer}>
-        <Image source={{ uri: thumbnailUrl }} style={styles.image} />
+        <Image source={{ uri: getResizedImage(thumbnailUrl, 226) }} style={styles.image} contentFit="cover" transition={300} />
         {/* PlayOverlay can be shown by default or only on tap in mobile, let's keep it simple for now without hover states */}
       </View>
       <Text style={styles.title} numberOfLines={1}>{title}</Text>

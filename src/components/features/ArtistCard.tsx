@@ -1,6 +1,8 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { BouncyButton } from '../ui/BouncyButton';
+import { getResizedImage } from '@/utils/image';
 
 interface ArtistCardProps {
   id?: string;
@@ -13,7 +15,7 @@ interface ArtistCardProps {
 export function ArtistCard({ name, thumbnailUrl, onPress, style }: ArtistCardProps) {
   return (
     <BouncyButton style={[styles.card, style]} onPress={onPress} scaleValue={0.94}>
-      <Image source={{ uri: thumbnailUrl }} style={styles.image} />
+      <Image source={{ uri: getResizedImage(thumbnailUrl, 226) }} style={styles.image} contentFit="cover" transition={300} />
       <Text style={styles.name} numberOfLines={2}>{name}</Text>
     </BouncyButton>
   );

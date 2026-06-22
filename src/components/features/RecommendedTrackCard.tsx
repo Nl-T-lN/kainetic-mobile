@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { MoreVertical } from 'lucide-react-native';
 import type { Track } from '@/types/music';
+import { getResizedImage } from '@/utils/image';
 
 interface RecommendedTrackCardProps {
   track: Track;
@@ -13,8 +15,10 @@ export function RecommendedTrackCard({ track, onPress, width = 320 }: Recommende
   return (
     <TouchableOpacity style={[styles.card, { width }]} onPress={onPress} activeOpacity={0.8}>
       <Image 
-        source={{ uri: track.thumbnailUrl }} 
-        style={styles.image} 
+        source={{ uri: getResizedImage(track.thumbnailUrl, 226) }} 
+        style={styles.image}
+        contentFit="cover"
+        transition={300}
       />
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>{track.title}</Text>

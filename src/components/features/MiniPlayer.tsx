@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback, memo } from 'react';
-import { View, Text, StyleSheet, Pressable, Image, Dimensions, Platform, PanResponder, Modal, BackHandler } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Dimensions, Platform, PanResponder, Modal, BackHandler } from 'react-native';
+import { Image } from 'expo-image';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { GestureDetector, Gesture, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, { 
@@ -28,6 +29,8 @@ const BOTTOM_NAV_HEIGHT = TAB_BAR_HEIGHT;
 const ARTWORK_SIZE = SCREEN_WIDTH - 64;
 
 import { BouncyButton } from '../ui/BouncyButton';
+
+const AnimatedImage = Animated.createAnimatedComponent(Image);
 
 const clamp = Extrapolation.CLAMP;
 
@@ -548,10 +551,12 @@ export default function PremiumPlayerLayout() {
 
       {/* SHARED ELEMENT ARTWORK OVERLAY */}
       <GestureDetector gesture={artworkGesture}>
-        <Animated.Image 
+        <AnimatedImage 
           source={{ uri: currentTrack.thumbnailUrl }} 
           style={animatedArtworkStyle as any} 
           animatedProps={artworkProps as any}
+          contentFit="cover"
+          transition={300}
         />
       </GestureDetector>
     </Animated.View>

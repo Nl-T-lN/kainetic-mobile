@@ -74,70 +74,72 @@ export default function ArtistView() {
         <ChevronLeft size={28} color="#fff" />
       </TouchableOpacity>
       
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.heroSection}>
-          <Image source={{ uri: data.thumbnailUrl }} style={[StyleSheet.absoluteFill, { opacity: 0.8 }]} blurRadius={50} />
-          <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+      <TrackList 
+        tracks={data.topTracks}
+        onTrackSelect={handlePlayTrack}
+        hideThumbnails={false}
+        contentContainerStyle={styles.content}
+        ListHeaderComponent={
+          <View>
+            <View style={styles.heroSection}>
+              <Image source={{ uri: data.thumbnailUrl }} style={[StyleSheet.absoluteFill, { opacity: 0.8 }]} blurRadius={50} />
+              <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
 
-          <View style={styles.heroContent}>
-            <Image source={{ uri: data.thumbnailUrl }} style={styles.heroImage} />
-            <Text style={styles.title} numberOfLines={2}>{data.name}</Text>
-            <Text style={styles.author}>{data.subscribers}</Text>
-            
-            <TouchableOpacity style={styles.playButton} onPress={handlePlayAll}>
-              <Play size={24} color="#000" fill="#000" />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.sectionContainer}>
-          <Text style={styles.sectionHeader}>Top Tracks</Text>
-          <View style={styles.trackList}>
-            <TrackList 
-              tracks={data.topTracks}
-              onTrackSelect={handlePlayTrack}
-              hideThumbnails={false}
-            />
-          </View>
-        </View>
-
-        {data.albums.length > 0 && (
-            <View style={styles.sectionContainer}>
-                <Text style={styles.sectionHeader}>Albums</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-                    {data.albums.map((album, idx) => (
-                        <PlaylistCard
-                          key={idx}
-                          id={album.id}
-                          title={album.title}
-                          subtitle={album.year}
-                          thumbnailUrl={album.thumbnailUrl}
-                          onPress={() => router.push(`/album/${album.id}`)}
-                        />
-                    ))}
-                </ScrollView>
+              <View style={styles.heroContent}>
+                <Image source={{ uri: data.thumbnailUrl }} style={styles.heroImage} />
+                <Text style={styles.title} numberOfLines={2}>{data.name}</Text>
+                <Text style={styles.author}>{data.subscribers}</Text>
+                
+                <TouchableOpacity style={styles.playButton} onPress={handlePlayAll}>
+                  <Play size={24} color="#000" fill="#000" />
+                </TouchableOpacity>
+              </View>
             </View>
-        )}
-
-        {data.singles.length > 0 && (
             <View style={styles.sectionContainer}>
-                <Text style={styles.sectionHeader}>Singles</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
-                    {data.singles.map((single, idx) => (
-                        <PlaylistCard
-                          key={idx}
-                          id={single.id}
-                          title={single.title}
-                          subtitle={single.year}
-                          thumbnailUrl={single.thumbnailUrl}
-                          onPress={() => router.push(`/album/${single.id}`)}
-                        />
-                    ))}
-                </ScrollView>
+              <Text style={styles.sectionHeader}>Top Tracks</Text>
             </View>
-        )}
+          </View>
+        }
+        ListFooterComponent={
+          <View>
+            {data.albums.length > 0 && (
+                <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionHeader}>Albums</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+                        {data.albums.map((album, idx) => (
+                            <PlaylistCard
+                              key={idx}
+                              id={album.id}
+                              title={album.title}
+                              subtitle={album.year}
+                              thumbnailUrl={album.thumbnailUrl}
+                              onPress={() => router.push(`/album/${album.id}`)}
+                            />
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
 
-      </ScrollView>
+            {data.singles.length > 0 && (
+                <View style={styles.sectionContainer}>
+                    <Text style={styles.sectionHeader}>Singles</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+                        {data.singles.map((single, idx) => (
+                            <PlaylistCard
+                              key={idx}
+                              id={single.id}
+                              title={single.title}
+                              subtitle={single.year}
+                              thumbnailUrl={single.thumbnailUrl}
+                              onPress={() => router.push(`/album/${single.id}`)}
+                            />
+                        ))}
+                    </ScrollView>
+                </View>
+            )}
+          </View>
+        }
+      />
     </View>
   );
 }

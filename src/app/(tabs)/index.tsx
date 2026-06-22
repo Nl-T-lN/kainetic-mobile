@@ -15,7 +15,6 @@ import { ArtistCard } from '@/components/features/ArtistCard';
 import { RecommendedTrackCard } from '@/components/features/RecommendedTrackCard';
 import { SpeedDialCard } from '@/components/features/SpeedDialCard';
 import { SongGridCard } from '@/components/features/SongGridCard';
-import { RefreshCw } from 'lucide-react-native';
 
 // Global cache to prevent rate-limiting on hot reloads
 let cachedHomeSections: HomeSection[] | null = null;
@@ -39,17 +38,28 @@ export default function HomeTab() {
   const { width } = useWindowDimensions();
   const setCurrentTrack = usePlayerStore((state) => state.setCurrentTrack);
   const setQueue = usePlayerStore((state) => state.setQueue);
+  const dominantColor = usePlayerStore((state) => state.dominantColor);
   const [sections, setSections] = useState<HomeSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [isAtTop, setIsAtTop] = useState(true);
 
   const insets = useSafeAreaInsets();
   const lastScrollY = React.useRef(0);
+  const isAtTopRef = React.useRef(true);
   const translateY = React.useRef(new Animated.Value(0)).current;
 
   const handleScroll = useCallback((event: any) => {
     const currentY = event.nativeEvent.contentOffset.y;
     const deltaY = currentY - lastScrollY.current;
+
+    if (currentY <= 10 && !isAtTopRef.current) {
+      isAtTopRef.current = true;
+      setIsAtTop(true);
+    } else if (currentY > 10 && isAtTopRef.current) {
+      isAtTopRef.current = false;
+      setIsAtTop(false);
+    }
 
     if (currentY < 50) {
       Animated.timing(translateY, {
@@ -503,7 +513,11 @@ export default function HomeTab() {
 
   return (
     <ScreenWrapper style={styles.container}>
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: '#000', zIndex: 101 }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: insets.top, backgroundColor: '#000', zIndex: 101 }}>
+        {dominantColor && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: dominantColor, opacity: 0.15 }} />
+        )}
+      </View>
       <Animated.View 
         style={{ 
           transform: [{ translateY }], 
@@ -515,6 +529,9 @@ export default function HomeTab() {
           backgroundColor: 'rgba(0,0,0,0.85)'
         }}
       >
+        {dominantColor && (
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: dominantColor, opacity: 0.15 }} />
+        )}
         <TopBar title="Home" />
       </Animated.View>
       <Animated.FlatList
@@ -533,6 +550,7 @@ export default function HomeTab() {
             tintColor="#1db954"
             colors={["#1db954"]} 
             progressViewOffset={100}
+            enabled={isAtTop}
           />
         }
       />
@@ -564,16 +582,6 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.5,
-  },
-  iconButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   playAllButton: {
     paddingHorizontal: 12,

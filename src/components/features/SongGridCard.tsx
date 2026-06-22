@@ -1,7 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { BouncyButton } from '../ui/BouncyButton';
 import type { Track } from '@/types/music';
+import { getResizedImage } from '@/utils/image';
 
 interface SongGridCardProps {
   track: Track;
@@ -15,9 +17,10 @@ export function SongGridCard({ track, onPress, width = 160 }: SongGridCardProps)
   return (
     <BouncyButton onPress={onPress} style={[styles.container, { width }]} scaleValue={0.96}>
       <Image 
-        source={{ uri: track.thumbnailUrl }} 
+        source={{ uri: getResizedImage(track.thumbnailUrl, 226) }} 
         style={[styles.image, { height }]} 
-        resizeMode="cover"
+        contentFit="cover"
+        transition={300}
       />
       <View style={styles.info}>
         <Text style={styles.title} numberOfLines={1}>{track.title}</Text>

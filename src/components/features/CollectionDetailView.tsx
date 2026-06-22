@@ -1,11 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { ChevronLeft, Play } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { BlurView } from 'expo-blur';
 import { TrackList } from '@/components/features/TrackList';
 import type { Track } from '@/types/music';
 import type { BrowseResult } from '@/services/YouTubeBrowseService';
+import { getResizedImage } from '@/utils/image';
 
 interface CollectionDetailViewProps {
   data: BrowseResult | null;
@@ -41,11 +43,11 @@ export default function CollectionDetailView({ data, loading, type, onPlayTrack 
 
   const HeroSection = () => (
     <View style={styles.heroSection}>
-      <Image source={{ uri: data.thumbnailUrl }} style={[StyleSheet.absoluteFill, { opacity: 0.8 }]} blurRadius={50} />
+      <Image source={{ uri: getResizedImage(data.thumbnailUrl, 800) }} style={[StyleSheet.absoluteFill, { opacity: 0.8 }]} blurRadius={50} contentFit="cover" transition={400} />
       <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
       
       <View style={styles.heroContent}>
-        <Image source={{ uri: data.thumbnailUrl }} style={styles.heroImage} />
+        <Image source={{ uri: getResizedImage(data.thumbnailUrl, 480) }} style={styles.heroImage} contentFit="cover" transition={400} />
         <Text style={styles.title} numberOfLines={2}>{data.title}</Text>
         <Text style={styles.author}>{type} • {data.author}</Text>
         <Text style={styles.stats}>{data.tracks.length} songs • {durationMins} minutes</Text>

@@ -1,15 +1,18 @@
 import React, { memo, useCallback } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image, FlatList, ListRenderItem } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, FlatList, ListRenderItem } from 'react-native';
+import { Image } from 'expo-image';
 import type { Track } from '@/types/music';
 import { Play, MoreVertical } from 'lucide-react-native';
 import { usePlayerStore } from '@/store/playerStore';
 import { useRouter } from 'expo-router';
+import { getResizedImage } from '@/utils/image';
 
 interface TrackListProps {
   tracks: Track[];
   onTrackSelect: (track: Track, index: number) => void;
   hideThumbnails?: boolean;
   ListHeaderComponent?: React.ReactElement;
+  ListFooterComponent?: React.ReactElement;
   contentContainerStyle?: any;
 }
 
@@ -59,8 +62,10 @@ const TrackItem = memo(({
 
       {!hideThumbnails && (
         <Image 
-          source={{ uri: item.thumbnailUrl || "https://images.unsplash.com/photo-1619983081563-430f63602796?auto=format&fit=crop&q=80&w=200" }} 
-          style={styles.thumbnail} 
+          source={{ uri: item.thumbnailUrl ? getResizedImage(item.thumbnailUrl, 88) : "https://images.unsplash.com/photo-1619983081563-430f63602796?auto=format&fit=crop&q=80&w=200" }} 
+          style={styles.thumbnail}
+          contentFit="cover"
+          transition={200}
         />
       )}
 
@@ -84,7 +89,14 @@ const TrackItem = memo(({
   );
 });
 
-export function TrackList({ tracks, onTrackSelect, hideThumbnails, ListHeaderComponent, contentContainerStyle }: TrackListProps) {
+export function TrackList({ 
+  tracks, 
+  onTrackSelect, 
+  hideThumbnails, 
+  ListHeaderComponent, 
+  ListFooterComponent,
+  contentContainerStyle 
+}: TrackListProps) {
   const currentTrackId = usePlayerStore((state) => state.currentTrack?.videoId);
   const isPlaying = usePlayerStore((state) => state.isPlaying);
   const router = useRouter();
@@ -119,6 +131,7 @@ export function TrackList({ tracks, onTrackSelect, hideThumbnails, ListHeaderCom
       renderItem={renderItem}
       keyExtractor={(item, index) => `${item.videoId}-${index}`}
       ListHeaderComponent={ListHeaderComponent}
+      ListFooterComponent={ListFooterComponent}
       contentContainerStyle={[styles.listContent, contentContainerStyle]}
       removeClippedSubviews={true}
       maxToRenderPerBatch={10}

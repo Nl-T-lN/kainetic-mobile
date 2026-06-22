@@ -93,8 +93,7 @@ export class AudioService {
 
       console.log(`[AudioService] Requesting extraction for ${videoId}...`);
       
-      // Ensure native engine is warm
-      await new Promise(resolve => setTimeout(resolve, 500));
+
 
       const result = await InnerTubeService.getAudioStreamUrl(videoId, quality);
       

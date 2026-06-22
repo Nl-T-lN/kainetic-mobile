@@ -1,8 +1,10 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
+import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ChevronRight } from 'lucide-react-native';
 import { BouncyButton } from '../ui/BouncyButton';
+import { getResizedImage } from '@/utils/image';
 
 interface SpeedDialCardProps {
   title: string;
@@ -15,7 +17,7 @@ interface SpeedDialCardProps {
 export function SpeedDialCard({ title, thumbnailUrl, isPlayable, onPress, width = 140 }: SpeedDialCardProps) {
   return (
     <BouncyButton onPress={onPress} style={[styles.container, { width, height: width }]} scaleValue={0.96}>
-      <Image source={{ uri: thumbnailUrl }} style={styles.image} />
+      <Image source={{ uri: getResizedImage(thumbnailUrl, 226) }} style={styles.image} contentFit="cover" transition={300} />
       
       {/* Dark gradient for text visibility */}
       <LinearGradient

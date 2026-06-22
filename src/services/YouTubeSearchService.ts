@@ -28,7 +28,7 @@ export function getHighResThumbnail(thumbnails: any): string {
   let url = sorted[0].url;
 
   if (url.includes("googleusercontent.com") || url.includes("yt3.ggpht.com")) {
-    url = url.replace(/=[ws]\d+(?:-h\d+)?(?:-[a-zA-Z0-9_-]+)*/, "=w226-h226");
+    url = url.replace(/=[ws]\d+(?:-h\d+)?(?:-[a-zA-Z0-9_-]+)*/, "=w1200-h1200");
   } else if (url.includes("i.ytimg.com")) {
     url = url.replace("maxresdefault.jpg", "hqdefault.jpg");
   }
