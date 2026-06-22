@@ -14,11 +14,13 @@ import Animated, {
   runOnJS
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
-import { ChevronDown, Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, MoreVertical, MessageSquare, ListMusic, Heart } from 'lucide-react-native';
+import { ChevronDown, Play, Pause, SkipBack, SkipForward, Repeat, Shuffle, MoreVertical, MessageSquare, ListMusic, Heart, FolderPlus } from 'lucide-react-native';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
 import { AudioService } from '@/services/AudioService';
+import { AddToPlaylistModal } from '@/components/features/AddToPlaylistModal';
 import { getColors } from 'react-native-image-colors';
+import { getResizedImage } from '@/utils/image';
 import LyricsTab from './LyricsTab';
 import QueueTab from './QueueTab';
 
@@ -141,6 +143,7 @@ export default function PremiumPlayerLayout() {
   const toggleSaveTrack = useLibraryStore((state) => state.toggleSaveTrack);
 
   const [activeTab, setActiveTab] = useState<'LYRICS' | 'QUEUE' | null>(null);
+  const [isPlaylistModalVisible, setPlaylistModalVisible] = useState(false);
 
   // 0 = Mini Player snapped at bottom, 1 = Full Player full screen
   const playerProgress = useSharedValue(0);
@@ -487,10 +490,16 @@ export default function PremiumPlayerLayout() {
                 </View>
 
                 <View style={styles.trackDetailsLarge}>
-                  <View style={{ flex: 1 }}>
+                  <View style={{ flex: 1, marginRight: 16 }}>
                     <Text style={styles.titleLarge} numberOfLines={1}>{currentTrack.title}</Text>
                     <Text style={styles.artistLarge} numberOfLines={1}>{currentTrack.artist}</Text>
                   </View>
+                  <BouncyButton style={styles.iconButton} onPress={() => toggleSaveTrack(currentTrack)} rippleRadius={24}>
+                    <Heart size={26} color={isLiked ? "#54F790" : "#fff"} fill={isLiked ? "#54F790" : "transparent"} />
+                  </BouncyButton>
+                  <BouncyButton style={styles.iconButton} onPress={() => setPlaylistModalVisible(true)} rippleRadius={24}>
+                    <FolderPlus size={26} color="#fff" />
+                  </BouncyButton>
                 </View>
               </View>
             </GestureDetector>
@@ -553,12 +562,19 @@ export default function PremiumPlayerLayout() {
       <GestureDetector gesture={artworkGesture}>
         <AnimatedImage 
           source={{ uri: currentTrack.thumbnailUrl }} 
+          placeholder={{ uri: getResizedImage(currentTrack.thumbnailUrl, 226) }}
           style={animatedArtworkStyle as any} 
           animatedProps={artworkProps as any}
           contentFit="cover"
-          transition={300}
         />
       </GestureDetector>
+
+      <AddToPlaylistModal
+        visible={isPlaylistModalVisible}
+        track={currentTrack}
+        onClose={() => setPlaylistModalVisible(false)}
+        onAdded={() => setPlaylistModalVisible(false)}
+      />
     </Animated.View>
   );
 }
