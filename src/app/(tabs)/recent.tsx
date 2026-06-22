@@ -21,22 +21,20 @@ export default function RecentTab() {
   return (
     <ScreenWrapper style={styles.container}>
       <TopBar title="Recent" />
-      <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.sectionHeader}>Recently Played</Text>
-
-        {recentTracks.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>Your listening history will appear here.</Text>
-          </View>
-        ) : (
-          <View style={styles.list}>
-            <TrackList 
-              tracks={recentTracks}
-              onTrackSelect={handlePlay}
-            />
-          </View>
-        )}
-      </ScrollView>
+      {recentTracks.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyText}>Your listening history will appear here.</Text>
+        </View>
+      ) : (
+        <TrackList 
+          tracks={recentTracks}
+          onTrackSelect={handlePlay}
+          contentContainerStyle={styles.content}
+          ListHeaderComponent={
+            <Text style={styles.sectionHeader}>Recently Played</Text>
+          }
+        />
+      )}
     </ScreenWrapper>
   );
 }

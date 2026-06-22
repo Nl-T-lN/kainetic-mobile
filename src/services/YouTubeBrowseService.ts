@@ -128,9 +128,7 @@ export class YouTubeBrowseService {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36',
-          'X-YouTube-Client-Name': '67',
-          'X-YouTube-Client-Version': APIConfig.YOUTUBE.WEB_CLIENT_PAYLOAD.clientVersion,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
           'Origin': 'https://music.youtube.com',
           'Referer': 'https://music.youtube.com/',
         },
