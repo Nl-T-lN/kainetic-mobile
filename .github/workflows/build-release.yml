@@ -11,6 +11,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
 
     steps:
       # 1. Checkout the mobile app repository
@@ -21,14 +23,14 @@ jobs:
       - name: Checkout Extractor Module
         uses: actions/checkout@v4
         with:
-          repository: 'Nl-T-lN/kainetic-extractor'
-          path: 'kainetic-extractor'
+          repository: "Nl-T-lN/kainetic-extractor"
+          path: "kainetic-extractor"
 
-      # 3. Setup Node.js (Upgraded to 24 to avoid deprecation)
+      # 3. Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: "20"
           cache: "npm"
 
       # 4. Setup Java
@@ -45,16 +47,24 @@ jobs:
           sed -i 's|\.\./kainetic-extractor|\./kainetic-extractor|g' package.json
           npm install
 
-      # 6. Prebuild (Optional but recommended to mimic your local npx expo run:android)
+      # 6. Configure Production App Name & Package
+      - name: Apply Production Configurations
+        run: |
+          jq '.expo.name = "Kainetic" | .expo.android.package = "com.anonymous.kaineticmobile"' app.json > app_tmp.json && mv app_tmp.json app.json
+
+      # 7. Prebuild (Optional but recommended to mimic your local npx expo run:android)
       - name: Expo Prebuild
         run: npx expo prebuild --platform android --clean
 
-      # 7. Compile the Android APK natively
+      # 8. Compile the Android App
       - name: Build Android Release APK
         run: |
           cd android
           chmod +x ./gradlew
+          ./gradlew clean
           ./gradlew assembleRelease
+        env:
+          GRADLE_OPTS: "-Xmx4096m -XX:MaxMetaspaceSize=512m"
 
       # 8. Upload the generated APK to the workflow artifacts
       - name: Upload APK as Artifact
