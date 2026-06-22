@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, memo } from 'react';
 import { View, Text, StyleSheet, FlatList, ActivityIndicator, useWindowDimensions, TouchableOpacity, ScrollView, RefreshControl, Animated } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePlayerStore } from '@/store/playerStore';
 import { useLibraryStore } from '@/store/libraryStore';
@@ -82,6 +83,21 @@ export default function HomeTab() {
 
     if (isRefreshAction) {
       setRefreshing(true);
+    }
+
+    // Phase 1: Persistent Cache for instant cold boots (Stale-While-Revalidate)
+    if (!cachedHomeSections && !force && !isRefreshAction) {
+      try {
+        const stored = await AsyncStorage.getItem('HOME_CACHE');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          cachedHomeSections = parsed;
+          setSections(parsed);
+          setLoading(false);
+        }
+      } catch (e) {
+        // Ignore cache read errors
+      }
     }
 
     try {
@@ -172,7 +188,7 @@ export default function HomeTab() {
           items: stateRecentTracks.slice(0, 10).map((t: any) => ({
             ...t,
             id: t.videoId,
-            type: 'playlist'
+            type: 'song'
           })) as any
         });
       }
@@ -211,6 +227,9 @@ export default function HomeTab() {
       const finalSections = [...newSections, ...filteredSections];
       cachedHomeSections = finalSections;
       setSections(finalSections);
+      
+      // Save for next cold boot
+      AsyncStorage.setItem('HOME_CACHE', JSON.stringify(finalSections)).catch(() => {});
     } catch (err) {
       console.error('Failed to load home', err);
     } finally {
