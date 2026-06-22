@@ -15,18 +15,18 @@ jobs:
       - name: Checkout Mobile App
         uses: actions/checkout@v4
 
-      # 2. Checkout the extractor repository into the correct relative path
+      # 2. Checkout the extractor repository into the workspace
       - name: Checkout Extractor Module
         uses: actions/checkout@v4
         with:
-          repository: 'nl-t-ln/kainetic-extractor'
-          path: '../kainetic-extractor'
+          repository: 'Nl-T-lN/kainetic-extractor'
+          path: 'kainetic-extractor'
 
-      # 3. Setup Node.js
+      # 3. Setup Node.js (Upgraded to 24 to avoid deprecation)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
 
       # 4. Setup Java
@@ -37,9 +37,11 @@ jobs:
           java-version: "17"
           cache: "gradle"
 
-      # 5. Install dependencies (This will link the extractor successfully!)
-      - name: Install NPM dependencies
-        run: npm install
+      # 5. Patch package.json to look inside the workspace, then install dependencies
+      - name: Link Extractor and Install NPM dependencies
+        run: |
+          sed -i 's|\.\./kainetic-extractor|\./kainetic-extractor|g' package.json
+          npm install
 
       # 6. Prebuild (Optional but recommended to mimic your local npx expo run:android)
       - name: Expo Prebuild
