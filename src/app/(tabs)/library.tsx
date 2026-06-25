@@ -3,11 +3,13 @@ import { View, Text, StyleSheet, TouchableOpacity, Image, Modal, TextInput, Keyb
 import TopBar from '@/components/ui/TopBar';
 import { useLibraryStore } from '@/store/libraryStore';
 import { Plus, Heart, ListMusic } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import ScreenWrapper from '@/components/ui/ScreenWrapper';
 import { TrackList } from '@/components/features/TrackList';
 import { usePlayerStore } from '@/store/playerStore';
 
 export default function LibraryTab() {
+  const router = useRouter();
   const playlists = useLibraryStore(state => state.playlists);
   const savedTracks = useLibraryStore(state => state.savedTracks) || [];
   const createPlaylist = useLibraryStore(state => state.createPlaylist);
@@ -55,7 +57,11 @@ export default function LibraryTab() {
 
           {/* User Playlists */}
           {playlists.map(playlist => (
-            <TouchableOpacity key={playlist.id} style={styles.playlistCard}>
+            <TouchableOpacity 
+              key={playlist.id} 
+              style={styles.playlistCard}
+              onPress={() => router.push(`/playlist/${playlist.id}`)}
+            >
               <View style={styles.playlistImageFallback}>
                 {playlist.coverUrl ? (
                   <Image source={{ uri: playlist.coverUrl }} style={styles.playlistImage as any} />

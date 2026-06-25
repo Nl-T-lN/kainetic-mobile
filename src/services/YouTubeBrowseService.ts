@@ -89,7 +89,7 @@ export class YouTubeBrowseService {
           const twoRowItems = findKeys(shelf, 'musicTwoRowItemRenderer');
           const itemsList = title.includes('albums') ? albums : singles;
           for (const item of twoRowItems) {
-            const browseId = item.navigationEndpoint?.browseEndpoint?.browseId;
+            const browseId = item.navigationEndpoint?.browseEndpoint?.browseId || item.navigationEndpoint?.watchEndpoint?.videoId;
             if (!browseId) continue;
             const itemTitle = item.title?.runs?.[0]?.text || 'Unknown';
             const subtitle = item.subtitle?.runs?.map((r: any) => r.text).join('').replace(/•/g, '').trim() || '';
@@ -99,7 +99,8 @@ export class YouTubeBrowseService {
               id: browseId,
               title: itemTitle,
               year: subtitle,
-              thumbnailUrl: itemThumb
+              thumbnailUrl: itemThumb,
+              isVideo: !!item.navigationEndpoint?.watchEndpoint?.videoId
             });
           }
         }

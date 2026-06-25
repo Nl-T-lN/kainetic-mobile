@@ -89,6 +89,16 @@ export default function SearchTab() {
     }
   };
 
+  const removeRecentSearch = async (query: string) => {
+    try {
+      const updated = recentSearches.filter(q => q !== query);
+      setRecentSearches(updated);
+      await AsyncStorage.setItem(RECENT_SEARCHES_KEY, JSON.stringify(updated));
+    } catch (e) {
+      console.error('Failed to remove recent search', e);
+    }
+  };
+
   const handleSearch = useCallback(async (query: string) => {
     if (!query.trim()) return;
     setIsSearching(true);
@@ -183,18 +193,22 @@ export default function SearchTab() {
           ListHeaderComponentStyle={{ marginBottom: 16 }}
           contentContainerStyle={styles.recentContainer}
           renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.recentItem}
-              onPress={() => {
-                setSearchQuery(item);
-                setSubmittedQuery(item);
-                handleSearch(item);
-              }}
-            >
-              <Clock color="#888" size={20} />
-              <Text style={styles.recentItemText}>{item}</Text>
-              <X color="#444" size={20} />
-            </TouchableOpacity>
+            <View style={styles.recentItemRow}>
+              <TouchableOpacity 
+                style={styles.recentItem}
+                onPress={() => {
+                  setSearchQuery(item);
+                  setSubmittedQuery(item);
+                  handleSearch(item);
+                }}
+              >
+                <Clock color="#888" size={20} />
+                <Text style={styles.recentItemText}>{item}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => removeRecentSearch(item)} style={styles.removeRecentBtn}>
+                <X color="#444" size={20} />
+              </TouchableOpacity>
+            </View>
           )}
           ListFooterComponent={recentSearches.length > 0 ? (
             <TouchableOpacity onPress={clearRecentSearches} style={styles.clearButton}>
@@ -339,10 +353,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
+  recentItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
   recentItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
+    flex: 1,
+  },
+  removeRecentBtn: {
+    padding: 12,
   },
   recentItemText: {
     flex: 1,

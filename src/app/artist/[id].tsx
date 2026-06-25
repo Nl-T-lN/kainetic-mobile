@@ -113,7 +113,19 @@ export default function ArtistView() {
                               title={album.title}
                               subtitle={album.year}
                               thumbnailUrl={album.thumbnailUrl}
-                              onPress={() => router.push(`/album/${album.id}`)}
+                              onPress={() => {
+                                if (album.isVideo) {
+                                  handlePlayTrack({
+                                    videoId: album.id,
+                                    title: album.title,
+                                    artist: data.name,
+                                    thumbnailUrl: album.thumbnailUrl,
+                                    durationMs: 0
+                                  }, 0);
+                                } else {
+                                  router.push(`/album/${album.id}`);
+                                }
+                              }}
                             />
                         ))}
                     </ScrollView>
@@ -131,7 +143,19 @@ export default function ArtistView() {
                               title={single.title}
                               subtitle={single.year}
                               thumbnailUrl={single.thumbnailUrl}
-                              onPress={() => router.push(`/album/${single.id}`)}
+                              onPress={() => {
+                                if (single.isVideo) {
+                                  handlePlayTrack({
+                                    videoId: single.id,
+                                    title: single.title,
+                                    artist: data.name,
+                                    thumbnailUrl: single.thumbnailUrl,
+                                    durationMs: 0
+                                  }, 0);
+                                } else {
+                                  router.push(`/album/${single.id}`);
+                                }
+                              }}
                             />
                         ))}
                     </ScrollView>
